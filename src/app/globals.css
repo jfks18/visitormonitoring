@@ -1,7 +1,7 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  :root {
+    --background: #ffffff;
+    --foreground: #171717;
+  }
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -23,6 +23,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
 
 * {
   box-sizing: border-box;

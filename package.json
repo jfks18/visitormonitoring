@@ -12,6 +12,7 @@
     "bootstrap": "^5.3.6",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
+    "html5-qrcode": "^2.3.8",
     "next": "15.3.3",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
@@ -28,7 +29,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.3.3",
-    "html5-qrcode": "^2.3.8",
     "typescript": "^5"
   }
 }

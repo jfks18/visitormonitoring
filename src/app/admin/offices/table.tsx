@@ -29,7 +29,7 @@ const Table = () => {
   const fetchOffices = () => {
     setLoading(true);
     setError(null);
-    fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/offices', {
+  fetch('https://apivisitor.onrender.com/api/offices', {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     })
       .then(async res => {
@@ -62,7 +62,7 @@ const Table = () => {
     }
     setSubmitLoading(true);
     try {
-      const res = await fetch('https://buck-leading-pipefish.ngrok-free.app/api/offices', {
+  const res = await fetch('https://apivisitor.onrender.com/api/offices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ department: department.trim() })
@@ -81,7 +81,7 @@ const Table = () => {
 
   const handleDeleteOffice = async (id: number) => {
     try {
-      const res = await fetch(`https://buck-leading-pipefish.ngrok-free.app/api/offices/${id}`, {
+  const res = await fetch(`https://apivisitor.onrender.com/api/offices/${id}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       });
@@ -99,7 +99,7 @@ const Table = () => {
 
   const handleUpdateOffice = async (id: number, newName: string) => {
     try {
-      const res = await fetch(`https://buck-leading-pipefish.ngrok-free.app/api/offices/${id}`, {
+  const res = await fetch(`https://apivisitor.onrender.com/api/offices/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ department: newName })

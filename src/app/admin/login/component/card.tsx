@@ -26,7 +26,7 @@ const LoginCard = () => {
 
   const login = async (username: string, password: string) => {
     try {
-      const res = await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/login', {
+  const res = await fetch('https://apivisitor.onrender.com/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })

@@ -1,12 +1,11 @@
+"use client"
 import React from 'react'
 import Print from '../components/print'
 
-const page = () => {
+export default function PrintPage() {
   return (
     <div>
       <Print />
     </div>
   )
 }
-
-export default page

@@ -36,7 +36,7 @@ const RegistrationCard = () => {
       });
 
   const { data: officeRows, error: officeError, isLoading: officeLoading, mutate: refreshOffices } = useSWR(
-  'https://apivisitor.onrender.com/api/offices',
+    'https://gleesome-feracious-noelia.ngrok-free.dev/api/offices',
     fetcher,
     { refreshInterval: 5000 }
   );
@@ -66,7 +66,7 @@ const RegistrationCard = () => {
           }
         });
     const { data } = useSWR(
-  `https://apivisitor.onrender.com/api/professors/department/${officeId}`,
+      `https://gleesome-feracious-noelia.ngrok-free.dev/api/professors/department/${officeId}`,
       profFetcher,
       { refreshInterval: 5000 }
     );
@@ -114,7 +114,7 @@ const RegistrationCard = () => {
     const visitorsID = generateVisitorId();
 
     try {
-  const res = await fetch('https://apivisitor.onrender.com/api/visitorsdata', {
+      const res = await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/visitorsdata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -141,7 +141,7 @@ const RegistrationCard = () => {
       });
       if (!res.ok) throw new Error('Failed to register');
       // Also insert into /api/visitorlog
-  await fetch('https://apivisitor.onrender.com/api/visitorslog', {
+      await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/visitorslog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ visitorsID }),

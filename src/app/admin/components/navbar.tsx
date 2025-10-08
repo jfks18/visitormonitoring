@@ -15,7 +15,7 @@ const Navbar = () => {
       } catch {}
     }
     if (username) {
-  await fetch("https://apivisitor.onrender.com/api/logout", {
+      await fetch("https://gleesome-feracious-noelia.ngrok-free.dev/api/logout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username }),

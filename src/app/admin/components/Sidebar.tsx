@@ -9,7 +9,7 @@ const Sidebar = () => {
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     try {
-  await fetch('https://apivisitor.onrender.com/api/logout', {
+      await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/logout', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

@@ -18,7 +18,6 @@ interface Visitor {
 }
 
 const Table = () => {
-  console.log('Table mounted');
   const [data, setData] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,13 +43,13 @@ const Table = () => {
     const monthStartStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
     const monthEndStr = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
     Promise.all([
-      fetch(`https://buck-leading-pipefish.ngrok-free.app/api/visitors?createdAt=${todayStr}`, {
+      fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/visitors?createdAt=${todayStr}`, {
         headers: {
           'Accept': 'application/json',
           'ngrok-skip-browser-warning': 'true',
         },
       }).then(res => res.json()),
-      fetch(`https://buck-leading-pipefish.ngrok-free.app/api/visitors?startDate=${monthStartStr}&endDate=${monthEndStr}`, {
+      fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/visitors?startDate=${monthStartStr}&endDate=${monthEndStr}`, {
         headers: {
           'Accept': 'application/json',
           'ngrok-skip-browser-warning': 'true',
@@ -82,20 +81,47 @@ const Table = () => {
     return `${hour}:${minute} ${ampm}`;
   }
 
+  // Helper to get Manila date string in yyyy-mm-dd
+  function getManilaDateString(date: Date) {
+    return date.toLocaleString('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).slice(0, 10);
+  }
+  // Helper to get start/end of Manila day in UTC ISO string
+  function getManilaDayRange(date: Date) {
+    // Get Manila midnight
+    const manila = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    manila.setHours(0, 0, 0, 0);
+    const start = new Date(manila.getTime() - (manila.getTimezoneOffset() * 60000));
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+    return {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    };
+  }
+
+  // Manila date helpers
+  const todayManila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const todayManilaStr = getManilaDateString(todayManila);
+  const monthStartManila = new Date(todayManila.getFullYear(), todayManila.getMonth(), 1);
+  const monthEndManila = new Date(todayManila.getFullYear(), todayManila.getMonth() + 1, 0);
+  const monthStartManilaStr = getManilaDateString(monthStartManila);
+  const monthEndManilaStr = getManilaDateString(monthEndManila);
+
   useEffect(() => {
-    let url = 'https://buck-leading-pipefish.ngrok-free.app/api/visitors';
+    let url = 'https://gleesome-feracious-noelia.ngrok-free.dev/api/visitors';
     if (filter === 'today') {
-      url += `?createdAt=${todayStr}`;
+      url += `?startDate=${getManilaDayRange(todayManila).start}&endDate=${getManilaDayRange(todayManila).end}`;
     } else if (filter === 'month') {
-      url += `?startDate=${monthStartStr}&endDate=${monthEndStr}`;
+      url += `?startDate=${getManilaDayRange(monthStartManila).start}&endDate=${getManilaDayRange(monthEndManila).end}`;
     } else if (filter === 'range') {
       if (dateFrom && dateTo) {
-        url += `?startDate=${dateFrom}&endDate=${dateTo}`;
+        // Use Manila time for range
+        const from = new Date(dateFrom + 'T00:00:00');
+        const to = new Date(dateTo + 'T00:00:00');
+        url += `?startDate=${getManilaDayRange(from).start}&endDate=${getManilaDayRange(to).end}`;
       } else {
         return; // Don't fetch if dates are missing
       }
     }
-    console.log('Fetching:', url); // Log the API URL being fetched
     setLoading(true);
     setError(null);
     fetch(url, {
@@ -115,7 +141,6 @@ const Table = () => {
         }
         try {
           const json = JSON.parse(text);
-          console.log('Fetched data:', json);
           return json;
         } catch (e) {
           console.error('Non-JSON response:', text);
@@ -161,7 +186,7 @@ const Table = () => {
       const exportData = data.map(row => ({
         'Visitor ID': row.visitorsID,
         'Name': `${row.first_name} ${row.middle_name} ${row.last_name}`.replace(/  +/g, ' ').trim(),
-        'Purpose': row.purpose,
+        'Purpose': (row as any).purpose_of_visit ?? row.purpose ?? '',
         'Faculty to Visit': Array.isArray(row.faculty_to_visit) ? row.faculty_to_visit.join(', ') : row.faculty_to_visit,
         'Time In': formatTime(row.timeIn),
         'Time Out': formatTime(row.timeOut),
@@ -184,7 +209,7 @@ const Table = () => {
       const exportData = data.map(row => [
         row.visitorsID,
         `${row.first_name} ${row.middle_name} ${row.last_name}`.replace(/  +/g, ' ').trim(),
-        row.purpose,
+        (row as any).purpose_of_visit ?? row.purpose ?? '',
         Array.isArray(row.faculty_to_visit) ? row.faculty_to_visit.join(', ') : row.faculty_to_visit,
         formatTime(row.timeIn),
         formatTime(row.timeOut),
@@ -301,7 +326,7 @@ const Table = () => {
                           <i className="bi bi-people" style={{ color: '#22577A', marginRight: 8 }}></i>
                           {`${row.first_name} ${row.middle_name} ${row.last_name}`.replace(/  +/g, ' ').trim()}
                         </td>
-                        <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{row.purpose}</td>
+                        <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{(row as any).purpose_of_visit ?? row.purpose ?? ''}</td>
                         <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{Array.isArray(row.faculty_to_visit)
                           ? row.faculty_to_visit.map((f: any) =>
                               f && typeof f === 'object'

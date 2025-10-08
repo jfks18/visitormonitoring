@@ -9,7 +9,7 @@ const Sidebar = () => {
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     try {
-      await fetch('https://buck-leading-pipefish.ngrok-free.app/api/logout', {
+      await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/logout', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -23,8 +23,8 @@ const Sidebar = () => {
 
   const menu = [
     { label: 'Overview', path: '/admin/dashboard' },
-    { label: 'Office Management', path: '/admin/offices' },
-    { label: 'Professor Management', path: '/admin/professors' },
+    { label: 'Manage Office', path: '/admin/offices' },
+    { label: 'Manage Employee', path: '/admin/professors' },
   ];
 
   return (

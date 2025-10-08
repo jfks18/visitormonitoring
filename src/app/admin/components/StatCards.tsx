@@ -12,10 +12,10 @@ const StatCards = () => {
     const monthEndStr = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
     setLoading(true);
     Promise.all([
-      fetch(`https://buck-leading-pipefish.ngrok-free.app/api/visitors?createdAt=${todayStr}`, {
+      fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/visitors?createdAt=${todayStr}`, {
         headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       }).then(res => res.json()),
-      fetch(`https://buck-leading-pipefish.ngrok-free.app/api/visitors?startDate=${monthStartStr}&endDate=${monthEndStr}`, {
+      fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/visitors?startDate=${monthStartStr}&endDate=${monthEndStr}`, {
         headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       }).then(res => res.json())
     ]).then(([todayData, monthData]) => {

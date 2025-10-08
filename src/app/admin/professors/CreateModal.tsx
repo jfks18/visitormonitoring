@@ -45,7 +45,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ show, onClose, onSuccess, dep
     setSubmitLoading(true);
     try {
       const payload = { ...form, department: Number(form.department) };
-      const res = await fetch('https://buck-leading-pipefish.ngrok-free.app/api/professors', {
+      const res = await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/professors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

@@ -18,9 +18,7 @@ const PrintLayout = () => {
       setLoading(false)
       return
     }
-    // Debug: log the visitorID being fetched
-    console.log('Fetching visitor data for ID:', visitorID)
-    fetch(`https://buck-leading-pipefish.ngrok-free.app/api/visitorsdata/${encodeURIComponent(visitorID)}`, {
+    fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/visitorsdata/${encodeURIComponent(visitorID)}`, {
       headers: {
         'Accept': 'application/json',
         'ngrok-skip-browser-warning': 'true',

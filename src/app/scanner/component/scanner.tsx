@@ -36,7 +36,7 @@ const Scanner = () => {
     setScannerResult(result);
     setShowScanner(false);
     try {
-      const response = await fetch("https://buck-leading-pipefish.ngrok-free.app/api/visitorslog/scan", {
+      const response = await fetch("https://gleesome-feracious-noelia.ngrok-free.dev/api/visitorslog/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visitorsID: trimmedResult }),

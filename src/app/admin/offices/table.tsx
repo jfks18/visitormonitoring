@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import DeleteModal from './modal';
+import EditModal from './editmodal';
 
 interface Office {
   id: number;
@@ -15,6 +17,10 @@ const Table = () => {
   const [department, setDepartment] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<{ id: number; name: string } | null>(null);
 
   useEffect(() => {
     fetchOffices();
@@ -23,7 +29,7 @@ const Table = () => {
   const fetchOffices = () => {
     setLoading(true);
     setError(null);
-    fetch('https://buck-leading-pipefish.ngrok-free.app/api/offices', {
+    fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/offices', {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     })
       .then(async res => {
@@ -70,6 +76,43 @@ const Table = () => {
       setSubmitError(err.message || 'Failed to create office');
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  const handleDeleteOffice = async (id: number) => {
+    try {
+      const res = await fetch(`https://buck-leading-pipefish.ngrok-free.app/api/offices/${id}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Failed to delete office');
+      }
+      setShowDeleteModal(false);
+      setDeleteTarget(null);
+      fetchOffices();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete office');
+    }
+  };
+
+  const handleUpdateOffice = async (id: number, newName: string) => {
+    try {
+      const res = await fetch(`https://buck-leading-pipefish.ngrok-free.app/api/offices/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({ department: newName })
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Failed to update office');
+      }
+      setShowEditModal(false);
+      setEditTarget(null);
+      fetchOffices();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update office');
     }
   };
 
@@ -127,6 +170,7 @@ const Table = () => {
                     <tr style={{ color: '#888', fontWeight: 600, fontSize: 15, border: 'none', textAlign: 'left' }}>
                       <th style={{ padding: '16px 8px', border: 'none', background: 'none', fontWeight: 500, textAlign: 'left' }}>Office Name</th>
                       <th style={{ padding: '16px 8px', border: 'none', background: 'none', fontWeight: 500, textAlign: 'left' }}>Created At</th>
+                      <th style={{ padding: '16px 8px', border: 'none', background: 'none', fontWeight: 500, textAlign: 'left' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -134,6 +178,10 @@ const Table = () => {
                       <tr key={row.id} style={{ borderBottom: '1px solid #f0f0f0', transition: 'background 0.2s', background: 'none', textAlign: 'left' }}>
                         <td style={{ padding: '14px 8px', color: '#22577A', fontWeight: 600, textAlign: 'left' }}>{row.name}</td>
                         <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
+                        <td style={{ padding: '14px 8px', textAlign: 'left' }}>
+                          <button className="btn btn-sm btn-outline-primary me-2" onClick={() => { setEditTarget(row); setShowEditModal(true); }}>Edit</button>
+                          <button className="btn btn-sm btn-outline-danger" onClick={() => { setDeleteTarget(row); setShowDeleteModal(true); }}>Delete</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -181,6 +229,20 @@ const Table = () => {
           </div>
         </div>
       )}
+      {/* Modal for deleting office */}
+      <DeleteModal
+        show={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
+        onConfirm={() => deleteTarget && handleDeleteOffice(deleteTarget.id)}
+        officeName={deleteTarget?.name}
+      />
+      {/* Modal for editing office */}
+      <EditModal
+        show={showEditModal}
+        onClose={() => { setShowEditModal(false); setEditTarget(null); }}
+        onUpdate={newName => editTarget && handleUpdateOffice(editTarget.id, newName)}
+        officeName={editTarget?.name}
+      />
     </div>
   );
 };

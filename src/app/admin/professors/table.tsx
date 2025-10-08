@@ -1,6 +1,8 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import CreateModal from './CreateModal';
+import DeleteModal from './DeleteModal';
+import EditModal from './EditModal';
 
 interface Professor {
   id: number;
@@ -34,6 +36,12 @@ const Table = () => {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
   const [departmentFilter, setDepartmentFilter] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchProfessors();
@@ -43,7 +51,7 @@ const Table = () => {
   const fetchProfessors = () => {
     setLoading(true);
     setError(null);
-    fetch('https://buck-leading-pipefish.ngrok-free.app/api/professors', {
+    fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/professors', {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     })
       .then(async res => {
@@ -64,7 +72,7 @@ const Table = () => {
   };
 
   const fetchDepartments = () => {
-    fetch('https://buck-leading-pipefish.ngrok-free.app/api/offices', {
+    fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/offices', {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     })
       .then(async res => {
@@ -101,7 +109,7 @@ const Table = () => {
     try {
       // Convert department to number (id)
       const payload = { ...form, department: Number(form.department) };
-      const res = await fetch('https://buck-leading-pipefish.ngrok-free.app/api/professors', {
+      const res = await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/professors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -126,13 +134,39 @@ const Table = () => {
       setSubmitLoading(false);
     }
   };
-  
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      const res = await fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/professors/${deleteId}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete');
+      }
+      setShowDeleteModal(false);
+      setDeleteId(null);
+      fetchProfessors();
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return dateStr;
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
+
+  const selectedProfessor = data.find(p => p.id === deleteId);
+  const editProfessor = data.find(p => p.id === editId);
 
   return (
     <div style={{ padding: '0', background: 'none' }}>
@@ -206,6 +240,7 @@ const Table = () => {
                       <th style={{ padding: '16px 8px' }}>Position</th>
                       <th style={{ padding: '16px 8px' }}>Department</th>
                       <th style={{ padding: '16px 8px' }}>Created At</th>
+                      <th style={{ padding: '16px 8px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -222,6 +257,12 @@ const Table = () => {
                             <td style={{ padding: '14px 8px' }}>{row.position}</td>
                             <td style={{ padding: '14px 8px' }}>{dept ? dept.name : row.department}</td>
                             <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500 }}>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
+                            <td style={{ padding: '14px 8px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}>
+                                <button className="btn btn-sm btn-outline-primary" style={{ minWidth: 60 }} onClick={() => { setEditId(row.id); setShowEditModal(true); }}>Edit</button>
+                                <button className="btn btn-sm btn-outline-danger" style={{ minWidth: 60 }} onClick={() => { setDeleteId(row.id); setShowDeleteModal(true); }}>Delete</button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
@@ -239,6 +280,22 @@ const Table = () => {
         show={showModal}
         onClose={() => setShowModal(false)}
         onSuccess={fetchProfessors}
+        departments={departments}
+      />
+      {/* Delete Modal as component */}
+      <DeleteModal
+        show={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setDeleteId(null); }}
+        onDelete={handleDelete}
+        loading={deleteLoading}
+        error={deleteError}
+        professor={selectedProfessor}
+      />
+      <EditModal
+        show={showEditModal}
+        onClose={() => { setShowEditModal(false); setEditId(null); }}
+        onSuccess={fetchProfessors}
+        professor={editProfessor}
         departments={departments}
       />
     </div>

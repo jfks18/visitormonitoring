@@ -51,7 +51,7 @@ const Table = () => {
   const fetchProfessors = () => {
     setLoading(true);
     setError(null);
-    fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/professors', {
+  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/professors`, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     })
       .then(async res => {
@@ -72,7 +72,7 @@ const Table = () => {
   };
 
   const fetchDepartments = () => {
-    fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/offices', {
+  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/offices`, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     })
       .then(async res => {
@@ -109,7 +109,7 @@ const Table = () => {
     try {
       // Convert department to number (id)
       const payload = { ...form, department: Number(form.department) };
-      const res = await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/professors', {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/professors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -140,7 +140,7 @@ const Table = () => {
     setDeleteLoading(true);
     setDeleteError('');
     try {
-      const res = await fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/professors/${deleteId}`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/professors/${deleteId}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       });

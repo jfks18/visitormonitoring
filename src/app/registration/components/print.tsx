@@ -18,7 +18,7 @@ const PrintLayout = () => {
       setLoading(false)
       return
     }
-    fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/visitorsdata/${encodeURIComponent(visitorID)}`, {
+  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/visitorsdata/${encodeURIComponent(visitorID)}`, {
       headers: {
         'Accept': 'application/json',
         'ngrok-skip-browser-warning': 'true',

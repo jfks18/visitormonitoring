@@ -36,7 +36,7 @@ const RegistrationCard = () => {
       });
 
   const { data: officeRows, error: officeError, isLoading: officeLoading, mutate: refreshOffices } = useSWR(
-    'https://gleesome-feracious-noelia.ngrok-free.dev/api/offices',
+  `${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/offices`,
     fetcher,
     { refreshInterval: 5000 }
   );
@@ -66,7 +66,7 @@ const RegistrationCard = () => {
           }
         });
     const { data } = useSWR(
-      `https://gleesome-feracious-noelia.ngrok-free.dev/api/professors/department/${officeId}`,
+  `${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/professors/department/${officeId}`,
       profFetcher,
       { refreshInterval: 5000 }
     );
@@ -114,7 +114,7 @@ const RegistrationCard = () => {
     const visitorsID = generateVisitorId();
 
     try {
-      const res = await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/visitorsdata', {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/visitorsdata`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -141,7 +141,7 @@ const RegistrationCard = () => {
       });
       if (!res.ok) throw new Error('Failed to register');
       // Also insert into /api/visitorlog
-      await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/visitorslog', {
+  await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/visitorslog`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ visitorsID }),
@@ -241,17 +241,6 @@ const RegistrationCard = () => {
                 />
               </div>
               <div className="mb-3">
-                <label className="form-label fw-semibold">Purpose of Visit</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={purpose}
-                  onChange={e => setPurpose(e.target.value)}
-                  required
-                  placeholder="Enter your purpose of visit"
-                />
-              </div>
-              <div className="mb-3">
                 <label className="form-label fw-semibold d-flex align-items-center" style={{ gap: 8 }}>
                   Offices to Visit
                   <button type="button" className="btn btn-sm btn-outline-secondary" style={{ padding: '2px 8px', fontSize: 14 }} onClick={() => refreshOffices()} title="Refresh offices">
@@ -265,6 +254,17 @@ const RegistrationCard = () => {
                   onChange={opts => setSelectedOffices(Array.isArray(opts) ? opts.map((opt: any) => opt.value) : [])}
                   classNamePrefix="react-select"
                   placeholder="Select offices..."
+                />
+              </div>
+               <div className="mb-3">
+                <label className="form-label fw-semibold">Purpose of Visit</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={purpose}
+                  onChange={e => setPurpose(e.target.value)}
+                  required
+                  placeholder="Enter your purpose of visit"
                 />
               </div>
               <div className="d-flex justify-content-between mt-4">

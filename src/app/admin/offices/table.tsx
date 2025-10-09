@@ -29,7 +29,7 @@ const Table = () => {
   const fetchOffices = () => {
     setLoading(true);
     setError(null);
-    fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/offices', {
+  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/offices`, {
       headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
     })
       .then(async res => {
@@ -81,7 +81,7 @@ const Table = () => {
 
   const handleDeleteOffice = async (id: number) => {
     try {
-      const res = await fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/offices/${id}`, {
+      const res = await fetch(`https://buck-leading-pipefish.ngrok-free.app/api/offices/${id}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       });
@@ -99,7 +99,7 @@ const Table = () => {
 
   const handleUpdateOffice = async (id: number, newName: string) => {
     try {
-      const res = await fetch(`https://gleesome-feracious-noelia.ngrok-free.dev/api/offices/${id}`, {
+      const res = await fetch(`https://buck-leading-pipefish.ngrok-free.app/api/offices/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ department: newName })

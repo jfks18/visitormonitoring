@@ -36,7 +36,7 @@ const Scanner = () => {
     setScannerResult(result);
     setShowScanner(false);
     try {
-      const response = await fetch("https://gleesome-feracious-noelia.ngrok-free.dev/api/visitorslog/scan", {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/visitorslog/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visitorsID: trimmedResult }),

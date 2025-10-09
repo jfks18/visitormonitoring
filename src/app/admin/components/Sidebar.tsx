@@ -9,7 +9,7 @@ const Sidebar = () => {
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     try {
-  await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/logout`, {
+  await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/logout`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -28,7 +28,7 @@ const Sidebar = () => {
     { label: 'Manage Services', path: '/admin/service' },
     { label: 'Manage Position', path: '/admin/position' },
     { label: 'departments', path: '/admin/departments' },
-    
+
   ];
 
   return (

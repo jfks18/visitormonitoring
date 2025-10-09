@@ -75,7 +75,7 @@ const EditModal: React.FC<EditModalProps> = ({ show, onClose, onSuccess, profess
     setLoading(true);
     try {
       const payload = { ...form, department: Number(form.department) };
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/professors/${professor.id}`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/professors/${professor.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify(payload)

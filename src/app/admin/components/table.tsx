@@ -43,13 +43,13 @@ const Table = () => {
     const monthStartStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
     const monthEndStr = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
     Promise.all([
-  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/visitors?createdAt=${todayStr}`, {
+  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitors?createdAt=${todayStr}`, {
         headers: {
           'Accept': 'application/json',
           'ngrok-skip-browser-warning': 'true',
         },
       }).then(res => res.json()),
-  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/visitors?startDate=${monthStartStr}&endDate=${monthEndStr}`, {
+  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitors?startDate=${monthStartStr}&endDate=${monthEndStr}`, {
         headers: {
           'Accept': 'application/json',
           'ngrok-skip-browser-warning': 'true',
@@ -107,7 +107,7 @@ const Table = () => {
   const monthEndManilaStr = getManilaDateString(monthEndManila);
 
   useEffect(() => {
-  let url = `${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/visitors`;
+  let url = `${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitors`;
     if (filter === 'today') {
       url += `?startDate=${getManilaDayRange(todayManila).start}&endDate=${getManilaDayRange(todayManila).end}`;
     } else if (filter === 'month') {

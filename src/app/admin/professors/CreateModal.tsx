@@ -45,7 +45,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ show, onClose, onSuccess, dep
     setSubmitLoading(true);
     try {
       const payload = { ...form, department: Number(form.department) };
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://apivisitor.onrender.com'}/api/professors`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/professors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

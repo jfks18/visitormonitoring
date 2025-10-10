@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import CreateModal from './CreateModal';
 import DeleteModal from './DeleteModal';
 import EditModal from './EditModal';
+import AccountModal from './AccountModal';
 
 interface Professor {
   id: number;
@@ -42,6 +43,8 @@ const Table = () => {
   const [deleteError, setDeleteError] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [accountProfessor, setAccountProfessor] = useState<Professor | null>(null);
 
   useEffect(() => {
     fetchProfessors();
@@ -259,6 +262,7 @@ const Table = () => {
                             <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500 }}>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
                             <td style={{ padding: '14px 8px' }}>
                               <div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}>
+                                <button className="btn btn-sm btn-outline-secondary" style={{ minWidth: 70 }} onClick={() => { setAccountProfessor(row); setShowAccountModal(true); }}>Account</button>
                                 <button className="btn btn-sm btn-outline-primary" style={{ minWidth: 60 }} onClick={() => { setEditId(row.id); setShowEditModal(true); }}>Edit</button>
                                 <button className="btn btn-sm btn-outline-danger" style={{ minWidth: 60 }} onClick={() => { setDeleteId(row.id); setShowDeleteModal(true); }}>Delete</button>
                               </div>
@@ -297,6 +301,12 @@ const Table = () => {
         onSuccess={fetchProfessors}
         professor={editProfessor}
         departments={departments}
+      />
+      <AccountModal
+        show={showAccountModal}
+        onClose={() => { setShowAccountModal(false); setAccountProfessor(null); }}
+        professor={accountProfessor}
+        onSuccess={fetchProfessors}
       />
     </div>
   );

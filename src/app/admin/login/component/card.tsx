@@ -15,9 +15,15 @@ const LoginCard = () => {
     setError('');
     try {
       const data = await login(username, password);
-      // If login is successful and token is set, redirect to dashboard
+      // If login is successful and token is set, store dept_id and redirect accordingly
       if (data.user && data.user.adminToken) {
-        router.replace('/admin/dashboard');
+        const deptId = data.user.dept_id ?? null;
+        // redirect: if dept_id is null -> admin dashboard; otherwise go to department page
+        if (deptId === null) {
+          router.replace('/admin/dashboard');
+        } else {
+          router.replace('/departments');
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -39,7 +45,8 @@ const LoginCard = () => {
       if (data.user && data.user.adminToken) {
         localStorage.setItem('adminAuth', JSON.stringify({
           adminToken: data.user.adminToken,
-          username: data.user.username
+          username: data.user.username,
+          dept_id: data.user.dept_id ?? null
         }));
       }
       return data;

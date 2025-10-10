@@ -21,6 +21,11 @@ const RegistrationCard = () => {
   const [phone, setPhone] = useState('');
   const [selectedProfessors, setSelectedProfessors] = useState<{ [office: string]: string }>({});
   const [offices, setOffices] = useState<{ id: number; name: string }[]>([]);
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+
+  // Availability state for selected offices
+  const [officeAvailability, setOfficeAvailability] = useState<{ [officeId: string]: { available: boolean; message?: string } }>({});
+  const [proceedIfUnavailable, setProceedIfUnavailable] = useState(false);
 
   const fetcher = (url: string) =>
     fetch(url, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } })
@@ -46,6 +51,37 @@ const RegistrationCard = () => {
       setOffices(officeRows.map((row: any) => ({ id: row.id, name: row.department || row.name || '' })));
     }
   }, [officeRows]);
+
+  // Check availability for selected offices (best-effort; backend endpoints may not exist)
+  const checkOfficeAvailability = async (officeIds: string[]) => {
+    const map: { [officeId: string]: { available: boolean; message?: string } } = {};
+    await Promise.all(officeIds.map(async (id) => {
+      try {
+        // Assumption: backend exposes a status endpoint like /api/offices/{id}/status
+        const res = await fetch(`${apiBase}/api/offices/${encodeURIComponent(id)}/status`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) {
+          // If endpoint missing or error, mark as unknown/available-by-default
+          map[id] = { available: true };
+          return;
+        }
+        const data = await res.json();
+        // Expecting { available: boolean, message?: string }
+        map[id] = { available: !!data.available, message: data.message };
+      } catch (err) {
+        // Network or parsing error - treat as available (fail open) but record no message
+        map[id] = { available: true };
+      }
+    }));
+    setOfficeAvailability(prev => ({ ...prev, ...map }));
+  };
+
+  useEffect(() => {
+    if (selectedOffices.length > 0) {
+      // Reset override when selection changes
+      setProceedIfUnavailable(false);
+      checkOfficeAvailability(selectedOffices);
+    }
+  }, [selectedOffices]);
 
   // Child component for professor select per office
   const ProfessorSelect: React.FC<{

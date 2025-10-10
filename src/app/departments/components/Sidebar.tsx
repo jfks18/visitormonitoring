@@ -22,10 +22,9 @@ const Sidebar = () => {
   };
 
   const menu = [
-    { label: 'Overview', path: '/admin/dashboard' },
-    { label: 'Manage Office', path: '/admin/offices' },
-    { label: 'Manage Employee', path: '/admin/professors' },
-    { label: 'Manage Services', path: '/admin/service' },
+    { label: 'Dashboard', path: '/department' },
+    { label: 'Professor', path: '/departments/professor' },
+    { label: 'Visitors Log', path: '/admin/visitorslog' },
 
   ];
 

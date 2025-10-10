@@ -26,19 +26,18 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
-      <div className="container-fluid">
-        <a className="navbar-brand d-flex align-items-center gap-2" href="#">
+    <nav style={{ background: '#eaf9fc', boxShadow: '0 1px 6px #0001' }}>
+      <div className="container-fluid" style={{ display: 'flex', alignItems: 'center', padding: '12px 24px' }}>
+        <a className="navbar-brand d-flex align-items-center gap-2" href="#" style={{ color: '#22577A' }}>
           <i className="bi bi-shield-lock-fill fs-4"></i>
           <span className="fw-bold">Admin Panel</span>
         </a>
-        <div className="d-flex align-items-center gap-3 ms-auto">
-          <span className="text-white small d-none d-md-inline">
-            Logged in as <b>admin</b>
-          </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ color: '#22577A', fontSize: 14, display: 'none' }} className="d-none d-md-inline">Logged in as <b>admin</b></span>
           <button
-            className="btn btn-danger d-flex align-items-center gap-1"
+            className="btn d-flex align-items-center gap-1"
             onClick={handleLogout}
+            style={{ background: '#22577A', color: '#fff', borderRadius: 8, padding: '6px 10px' }}
           >
             <i className="bi bi-box-arrow-right"></i> Logout
           </button>

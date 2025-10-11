@@ -45,6 +45,8 @@ const Table = () => {
   const [editId, setEditId] = useState<number | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [accountProfessor, setAccountProfessor] = useState<Professor | null>(null);
+  const [showAccountExistsModal, setShowAccountExistsModal] = useState(false);
+  const [accountExistsProfessor, setAccountExistsProfessor] = useState<Professor | null>(null);
 
   useEffect(() => {
     fetchProfessors();
@@ -262,7 +264,45 @@ const Table = () => {
                             <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500 }}>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
                             <td style={{ padding: '14px 8px' }}>
                               <div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}>
-                                <button className="btn btn-sm btn-outline-secondary" style={{ minWidth: 70 }} onClick={() => { setAccountProfessor(row); setShowAccountModal(true); }}>Account</button>
+                                <button
+                                  className="btn btn-sm btn-outline-secondary"
+                                  style={{ minWidth: 70 }}
+                                  onClick={async () => {
+                                    setSubmitError('');
+                                    try {
+                                      // fetch users for the professor's department
+                                      const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+                                      const deptId = row.department;
+                                      const res = await fetch(`${apiBase}/api/users?dept_id=${encodeURIComponent(deptId)}`, {
+                                        headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+                                      });
+                                      if (!res.ok) {
+                                        // if server error, still allow opening modal and rely on server-side duplicate handling
+                                        console.info('Failed to check existing users, allowing account creation: ', await res.text().catch(() => ''));
+                                        setAccountProfessor(row);
+                                        setShowAccountModal(true);
+                                        return;
+                                      }
+                                      const users = await res.json().catch(() => []);
+                                      const exists = Array.isArray(users) && users.some((u: any) => String(u.email).toLowerCase() === String(row.email).toLowerCase());
+                                      if (exists) {
+                                        // Show a modal informing the admin that an account already exists
+                                        setAccountExistsProfessor(row);
+                                        setShowAccountExistsModal(true);
+                                        return;
+                                      }
+                                      setAccountProfessor(row);
+                                      setShowAccountModal(true);
+                                    } catch (err: any) {
+                                      console.error('Error checking existing users:', err);
+                                      // allow modal to open if check fails
+                                      setAccountProfessor(row);
+                                      setShowAccountModal(true);
+                                    }
+                                  }}
+                                >
+                                  Account
+                                </button>
                                 <button className="btn btn-sm btn-outline-primary" style={{ minWidth: 60 }} onClick={() => { setEditId(row.id); setShowEditModal(true); }}>Edit</button>
                                 <button className="btn btn-sm btn-outline-danger" style={{ minWidth: 60 }} onClick={() => { setDeleteId(row.id); setShowDeleteModal(true); }}>Delete</button>
                               </div>
@@ -308,6 +348,22 @@ const Table = () => {
         professor={accountProfessor}
         onSuccess={fetchProfessors}
       />
+      {/* Account-exists warning modal */}
+      {showAccountExistsModal && accountExistsProfessor && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0006', zIndex: 1600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 20, minWidth: 360, boxShadow: '0 2px 24px #0003' }}>
+            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Account Already Created</div>
+            <div style={{ marginBottom: 12 }}>
+              <div><strong>Name:</strong> {accountExistsProfessor.first_name} {accountExistsProfessor.middle_name ?? ''} {accountExistsProfessor.last_name}</div>
+              <div><strong>Email:</strong> {accountExistsProfessor.email ?? '-'}</div>
+              <div style={{ color: '#666', marginTop: 8 }}>An account already exists for this professor's email.</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={() => { setShowAccountExistsModal(false); setAccountExistsProfessor(null); }}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

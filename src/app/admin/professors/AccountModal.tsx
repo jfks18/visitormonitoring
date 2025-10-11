@@ -21,6 +21,8 @@ interface Props {
 const AccountModal: React.FC<Props> = ({ show, onClose, professor, onSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [departmentName, setDepartmentName] = useState<string | null>(null);
@@ -31,7 +33,9 @@ const AccountModal: React.FC<Props> = ({ show, onClose, professor, onSuccess }) 
       const suggested = `${professor.first_name}.${professor.last_name}`.toLowerCase().replace(/\s+/g, '');
       setUsername(suggested);
       setPassword('');
-      setError('');
+  setError('');
+  setEmail(professor.email ?? '');
+  setPhone(professor.phone ?? '');
       // load department name when professor has department id
       if (professor.department) {
         const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
@@ -57,30 +61,93 @@ const AccountModal: React.FC<Props> = ({ show, onClose, professor, onSuccess }) 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!username.trim() || !password) {
-      setError('Username and password are required');
+    if (!username.trim() || !password || !email.trim() || !phone.trim()) {
+      setError('Username, email, phone and password are required');
       return;
     }
     setLoading(true);
     try {
+      // First try a dedicated email-check endpoint if available
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+        const checkRes = await fetch(`${apiBase}/api/users/check-email?email=${encodeURIComponent(email.trim())}`, { headers: { 'Accept': 'application/json' } });
+        if (checkRes.ok) {
+          const checkJson = await checkRes.json().catch(() => ({}));
+          if (checkJson?.exists) {
+            throw new Error('An account with this email already exists');
+          }
+        }
+        // If checkRes returns 404 or other non-ok, we'll just continue to POST and rely on server duplicate handling
+      } catch (checkErr) {
+        // If the check endpoint doesn't exist or failed, ignore and proceed to creation; duplicates will be caught by POST
+        // But if check explicitly says exists, the thrown error will be caught by outer catch
+        if (checkErr instanceof Error && checkErr.message === 'An account with this email already exists') throw checkErr;
+        // otherwise, log and continue
+        console.info('Email-check endpoint not available or failed, proceeding to create. Details:', checkErr);
+      }
+
+      // Build payload to match server expectation
+      const rawAuth = localStorage.getItem('adminAuth');
+      let deptId: number | null = null;
+      let adminToken: string | null = null;
+      try {
+        if (rawAuth) {
+          const parsed = JSON.parse(rawAuth);
+          deptId = parsed?.dept_id ?? null;
+          adminToken = parsed?.adminToken ?? null;
+        }
+      } catch {
+        deptId = null;
+        adminToken = null;
+      }
+
+      // Prefer the selected professor's department when available
+      if (professor?.department) {
+        deptId = Number(professor.department) || null;
+      } else if (!deptId && professor?.department) {
+        // redundant guard, kept for safety
+        deptId = Number(professor.department) || null;
+      }
+
       const payload = {
         username: username.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
         password,
-        role: 'professor',
+        dept_id: deptId,
+        // keep a reference to professor if server wants it
         professorId: professor.id,
-        email: professor.email,
       };
+
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (adminToken) headers['Authorization'] = `Bearer ${adminToken}`;
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/users`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || 'Failed to create user');
+
+      // Try to parse response body for helpful debug info
+      const text = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(text); } catch { data = { raw: text }; }
+      if (!res.ok) {
+        // Build a detailed message for debugging
+        const msg = data?.message || data?.raw || `Server returned ${res.status}`;
+        const debug = `Status: ${res.status} - ${msg} - dept_id:${deptId}`;
+        throw new Error(debug);
+      }
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to create user');
+      console.error('Create user error:', err);
+      // Friendly handling for duplicate email
+      if (err instanceof Error && /email already exists|already exists|ER_DUP_ENTRY/i.test(err.message)) {
+        setError('An account with this email or username already exists.');
+      } else {
+        setError(err.message || 'Failed to create user - check console for details');
+      }
     } finally {
       setLoading(false);
     }
@@ -104,6 +171,12 @@ const AccountModal: React.FC<Props> = ({ show, onClose, professor, onSuccess }) 
 
             <label style={{ fontWeight: 600 }}>Password</label>
             <input className="form-control" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+
+            <label style={{ fontWeight: 600 }}>Email</label>
+            <input className="form-control" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+
+            <label style={{ fontWeight: 600 }}>Phone</label>
+            <input className="form-control" value={phone} onChange={e => setPhone(e.target.value)} />
 
             <label style={{ fontWeight: 600 }}>Role</label>
             <input className="form-control" value="professor" readOnly />

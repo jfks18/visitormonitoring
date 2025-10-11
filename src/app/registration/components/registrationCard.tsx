@@ -12,7 +12,8 @@ const RegistrationCard = () => {
   const [lastName, setLastName] = useState('');
   const [gender, setGender] = useState('Male');
   const [birthDate, setBirthDate] = useState('');
-  const [purpose, setPurpose] = useState('');
+  const [selectedPurposes, setSelectedPurposes] = useState<{ [office: string]: string }>({});
+  
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -153,7 +154,7 @@ const RegistrationCard = () => {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitorsdata`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+          body: JSON.stringify({
           visitorsID,
           first_name: firstName,
           middle_name: middleName,
@@ -163,15 +164,15 @@ const RegistrationCard = () => {
           suffix: '', // or add a suffix field if you want
           gender,
           birth_date: birthDate,
-          purpose_of_visit: purpose,
           faculty_to_visit: selectedOffices.map(officeId => {
             const officeObj = offices.find(o => String(o.id) === officeId);
             const officeName = officeObj ? officeObj.name : officeId;
             const profId = selectedProfessors[officeId];
-            return {
-              office: officeName,
-              professor: profId || null
-            };
+             return {
+               office: officeName,
+               professor: profId || null,
+               purpose: selectedPurposes[officeId] || null
+             };
           }),
         }),
       });
@@ -190,8 +191,8 @@ const RegistrationCard = () => {
       setLastName('');
       setGender('Male');
       setBirthDate('');
-      setSelectedOffices([]);
-      setPurpose('');
+  setSelectedOffices([]);
+       setSelectedPurposes({});
       // Redirect to print layout with visitorID as query param
       router.push(`/registration/print?page=receipt&visitorID=${visitorsID}`);
     } catch (err: any) {
@@ -204,7 +205,7 @@ const RegistrationCard = () => {
   // Validation for each step
   const isStep1Valid = firstName.trim() && lastName.trim() && phone.trim();
   const isStep2Valid = selectedOffices.length > 0;
-  const isStep3Valid = selectedOffices.every(office => selectedProfessors[office]);
+  const isStep3Valid = selectedOffices.every(office => selectedProfessors[office] && (selectedPurposes[office] && selectedPurposes[office].trim() !== ''));
 
   return (
     <div className="d-flex align-items-center justify-content-center min-vh-100 bg-light">
@@ -292,17 +293,7 @@ const RegistrationCard = () => {
                   placeholder="Select offices..."
                 />
               </div>
-               <div className="mb-3">
-                <label className="form-label fw-semibold">Purpose of Visit</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={purpose}
-                  onChange={e => setPurpose(e.target.value)}
-                  required
-                  placeholder="Enter your purpose of visit"
-                />
-              </div>
+              
               <div className="d-flex justify-content-between mt-4">
                 <button type="button" className="btn btn-secondary px-4" onClick={() => setStep(1)}>
                   Previous
@@ -321,7 +312,7 @@ const RegistrationCard = () => {
               <div className="mb-3">
                 <label className="form-label fw-semibold">Selected Offices and Professors</label>
                 {selectedOffices.length === 0 && <div className="text-muted">No office selected.</div>}
-                {selectedOffices.map((officeId) => {
+                    {selectedOffices.map((officeId) => {
                   const office = offices.find(o => String(o.id) === officeId);
                   return (
                     <div key={officeId} className="mb-3 p-2 border rounded bg-light">
@@ -331,6 +322,10 @@ const RegistrationCard = () => {
                         value={selectedProfessors[officeId] || ''}
                         onChange={profId => setSelectedProfessors(prev => ({ ...prev, [officeId]: profId }))}
                       />
+                          <div className="mt-2">
+                            <label className="form-label fw-semibold">Purpose for this office</label>
+                            <input type="text" className="form-control" value={selectedPurposes[officeId] || ''} onChange={e => setSelectedPurposes(prev => ({ ...prev, [officeId]: e.target.value }))} required />
+                          </div>
                     </div>
                   );
                 })}

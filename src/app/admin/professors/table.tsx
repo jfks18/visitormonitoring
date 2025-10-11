@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import { toManilaDateTime } from '../../../lib/manila';
 import CreateModal from './CreateModal';
 import DeleteModal from './DeleteModal';
 import EditModal from './EditModal';
@@ -261,7 +262,7 @@ const Table = () => {
                             <td style={{ padding: '14px 8px' }}>{row.email}</td>
                             <td style={{ padding: '14px 8px' }}>{row.position}</td>
                             <td style={{ padding: '14px 8px' }}>{dept ? dept.name : row.department}</td>
-                            <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500 }}>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
+                            <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500 }}>{row.createdAt ? toManilaDateTime(row.createdAt) : '-'}</td>
                             <td style={{ padding: '14px 8px' }}>
                               <div style={{ display: 'flex', flexDirection: 'row', gap: 8 }}>
                                 <button

@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState, useRef } from 'react';
+import { toManilaDateTime } from '../../../lib/manila';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { QRCodeSVG } from 'qrcode.react';
@@ -190,7 +191,7 @@ const Table = () => {
         'Faculty to Visit': Array.isArray(row.faculty_to_visit) ? row.faculty_to_visit.join(', ') : row.faculty_to_visit,
         'Time In': formatTime(row.timeIn),
         'Time Out': formatTime(row.timeOut),
-        'Log Date': row.logCreatedAt ? new Date(row.logCreatedAt).toLocaleString() : '-'
+        'Log Date': row.logCreatedAt ? toManilaDateTime(row.logCreatedAt) : '-'
       }));
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
@@ -213,7 +214,7 @@ const Table = () => {
         Array.isArray(row.faculty_to_visit) ? row.faculty_to_visit.join(', ') : row.faculty_to_visit,
         formatTime(row.timeIn),
         formatTime(row.timeOut),
-        row.logCreatedAt ? new Date(row.logCreatedAt).toLocaleString() : '-'
+        row.logCreatedAt ? toManilaDateTime(row.logCreatedAt) : '-'
       ]);
       autoTable(doc, {
         head: [[
@@ -339,7 +340,7 @@ const Table = () => {
                         </td>
                         <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{formatTime(row.timeIn)}</td>
                         <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{formatTime(row.timeOut)}</td>
-                        <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{row.logCreatedAt ? new Date(row.logCreatedAt).toLocaleString() : '-'}</td>
+                        <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{row.logCreatedAt ? toManilaDateTime(row.logCreatedAt) : '-'}</td>
                         <td style={{ padding: '14px 8px', textAlign: 'left' }}>
                           <button className="btn btn-link p-0" style={{ color: '#22577A' }} title="Print Visitor Pass" onClick={() => router.push(`/registration/print?visitorID=${row.visitorsID}`)}>
                             <i className="bi bi-printer" style={{ fontSize: 18 }}></i>

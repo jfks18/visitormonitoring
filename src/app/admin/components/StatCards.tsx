@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import { toManilaDateTime } from '../../../lib/manila';
 
 interface Visitor {
   visitorsID: string;
@@ -172,7 +173,7 @@ const StatCards = () => {
                             <td>{Array.isArray(v.faculty_to_visit) ? v.faculty_to_visit.map((f:any)=> typeof f === 'object' ? (f.professor ? `${f.office}: ${f.professor}` : f.office) : f).join(', ') : JSON.stringify(v.faculty_to_visit)}</td>
                             <td>{formatTime(v.timeIn ?? null)}</td>
                             <td>{formatTime(v.timeOut ?? null)}</td>
-                            <td>{v.logCreatedAt ? new Date(v.logCreatedAt).toLocaleString() : '-'}</td>
+                            <td>{v.logCreatedAt ? toManilaDateTime(v.logCreatedAt) : '-'}</td>
                           </tr>
                         ))}
                         {visitors.length === 0 && (

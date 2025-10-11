@@ -1,5 +1,6 @@
 'use client'
 import React from 'react'
+import { toManilaDateTime } from '../../../lib/manila';
 import { useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -128,7 +129,7 @@ const PrintLayout = () => {
             })}
           </div>
         </div>
-        <div>Date: {new Date().toLocaleString()}</div>
+  <div>Date: {toManilaDateTime(new Date())}</div>
       </div>
       <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '8px 0' }} />
       {/* Footer */}

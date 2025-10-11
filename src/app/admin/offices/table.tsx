@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { toManilaDateTime } from '../../../lib/manila';
 import DeleteModal from './modal';
 import EditModal from './editmodal';
 
@@ -177,7 +178,7 @@ const Table = () => {
                     {data.map((row) => (
                       <tr key={row.id} style={{ borderBottom: '1px solid #f0f0f0', transition: 'background 0.2s', background: 'none', textAlign: 'left' }}>
                         <td style={{ padding: '14px 8px', color: '#22577A', fontWeight: 600, textAlign: 'left' }}>{row.name}</td>
-                        <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
+                        <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500, textAlign: 'left' }}>{row.createdAt ? toManilaDateTime(row.createdAt) : '-'}</td>
                         <td style={{ padding: '14px 8px', textAlign: 'left' }}>
                           <button className="btn btn-sm btn-outline-primary me-2" onClick={() => { setEditTarget(row); setShowEditModal(true); }}>Edit</button>
                           <button className="btn btn-sm btn-outline-danger" onClick={() => { setDeleteTarget(row); setShowDeleteModal(true); }}>Delete</button>

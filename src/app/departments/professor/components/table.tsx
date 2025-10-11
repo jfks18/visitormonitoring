@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import { toManilaDateTime } from '../../../../lib/manila';
 
 interface Professor {
   id: number;
@@ -69,10 +70,7 @@ const Table = () => {
   }, []);
 
   const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleString();
+    return dateStr ? toManilaDateTime(dateStr) : '-';
   };
 
   return (

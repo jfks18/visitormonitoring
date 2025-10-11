@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { toManilaDateTime } from '../../../lib/manila';
+import Table from './table';
 
 interface Visitor {
   visitorsID: string;
@@ -20,27 +21,42 @@ const StatCards = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [visitorsLoading, setVisitorsLoading] = useState(false);
-  const [visitorsError, setVisitorsError] = useState<string | null>(null);
+  const [tableInitialFilter, setTableInitialFilter] = useState<'today' | 'month'>('today');
 
   useEffect(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const monthStartStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-    const monthEndStr = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
+    // compute Manila day start/end in ISO so backend can filter by datetime range
+    const manilaNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const manilaStart = new Date(manilaNow);
+    manilaStart.setHours(0, 0, 0, 0);
+    const start = new Date(manilaStart.getTime() - (manilaStart.getTimezoneOffset() * 60000));
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+    const monthStartLocal = new Date(manilaNow.getFullYear(), manilaNow.getMonth(), 1);
+    monthStartLocal.setHours(0, 0, 0, 0);
+    const monthStart = new Date(monthStartLocal.getTime() - (monthStartLocal.getTimezoneOffset() * 60000));
+    const monthEndLocal = new Date(manilaNow.getFullYear(), manilaNow.getMonth() + 1, 0);
+    monthEndLocal.setHours(23, 59, 59, 999);
+    const monthEnd = new Date(monthEndLocal.getTime() - (monthEndLocal.getTimezoneOffset() * 60000));
+
+    const todayStartIso = start.toISOString();
+    const todayEndIso = end.toISOString();
+    const monthStartIso = monthStart.toISOString();
+    const monthEndIso = monthEnd.toISOString();
+
     setLoading(true);
     Promise.all([
-  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitors?createdAt=${todayStr}`, {
+      fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitors?startDate=${encodeURIComponent(todayStartIso)}&endDate=${encodeURIComponent(todayEndIso)}`, {
         headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       }).then(res => res.json()),
-  fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitors?startDate=${monthStartStr}&endDate=${monthEndStr}`, {
+      fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitors?startDate=${encodeURIComponent(monthStartIso)}&endDate=${encodeURIComponent(monthEndIso)}`, {
         headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       }).then(res => res.json())
     ]).then(([todayData, monthData]) => {
       setTodayCount(Array.isArray(todayData) ? todayData.length : 0);
       setMonthCount(Array.isArray(monthData) ? monthData.length : 0);
       setLoading(false);
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('StatCards fetch error', err);
       setTodayCount(null);
       setMonthCount(null);
       setLoading(false);
@@ -59,32 +75,10 @@ const StatCards = () => {
     return `${hour}:${minute} ${ampm}`;
   }
 
-  async function loadVisitors(mode: 'today' | 'month') {
-    setVisitors([]);
-    setVisitorsError(null);
-    setVisitorsLoading(true);
-    setShowModal(true);
+  function loadVisitors(mode: 'today' | 'month') {
     setModalTitle(mode === 'today' ? 'Today — Visitors' : 'This Month — Visitors');
-    try {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const monthStartStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-      const monthEndStr = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
-      const url = mode === 'today'
-        ? `${apiBase}/api/visitors?createdAt=${todayStr}`
-        : `${apiBase}/api/visitors?startDate=${monthStartStr}&endDate=${monthEndStr}`;
-      const res = await fetch(url, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } });
-      const text = await res.text();
-      if (!res.ok) throw new Error(text || 'Failed to fetch visitors');
-      if (text.trim().startsWith('<!DOCTYPE html>')) throw new Error('Received HTML instead of JSON');
-      const data = JSON.parse(text) as Visitor[];
-      setVisitors(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      console.error('Load visitors error:', err);
-      setVisitorsError(err.message || String(err));
-    } finally {
-      setVisitorsLoading(false);
-    }
+    setTableInitialFilter(mode);
+    setShowModal(true);
   }
 
   return (
@@ -147,45 +141,11 @@ const StatCards = () => {
                 <h5 className="modal-title">{modalTitle}</h5>
                 <button type="button" className="btn-close" onClick={() => setShowModal(false)}></button>
               </div>
-              <div className="modal-body">
-                {visitorsLoading && <div className="text-center py-3"><span className="spinner-border text-primary" role="status"></span></div>}
-                {visitorsError && <div className="alert alert-danger">{visitorsError}</div>}
-                {!visitorsLoading && !visitorsError && (
-                  <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>Visitor ID</th>
-                          <th>Name</th>
-                          <th>Purpose</th>
-                          <th>Faculty to Visit</th>
-                          <th>Time In</th>
-                          <th>Time Out</th>
-                          <th>Log Date</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visitors.map((v) => (
-                          <tr key={v.visitorsID}>
-                            <td>{v.visitorsID}</td>
-                            <td>{`${v.first_name} ${v.middle_name || ''} ${v.last_name || ''}`.replace(/  +/g, ' ').trim()}</td>
-                            <td>{(v as any).purpose_of_visit ?? v.purpose ?? ''}</td>
-                            <td>{Array.isArray(v.faculty_to_visit) ? v.faculty_to_visit.map((f:any)=> typeof f === 'object' ? (f.professor ? `${f.office}: ${f.professor}` : f.office) : f).join(', ') : JSON.stringify(v.faculty_to_visit)}</td>
-                            <td>{formatTime(v.timeIn ?? null)}</td>
-                            <td>{formatTime(v.timeOut ?? null)}</td>
-                            <td>{v.logCreatedAt ? toManilaDateTime(v.logCreatedAt) : '-'}</td>
-                          </tr>
-                        ))}
-                        {visitors.length === 0 && (
-                          <tr>
-                            <td colSpan={7} className="text-center text-muted">No visitors found.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                      <div className="modal-body">
+                        <div style={{ minHeight: '60vh' }}>
+                          <Table initialFilter={tableInitialFilter} hideControls={true} />
+                        </div>
+                      </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Close</button>
               </div>

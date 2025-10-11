@@ -46,11 +46,16 @@ function formatFullName(person: any | null | undefined) {
   return parts.length ? parts.join(' ') : null;
 }
 
-const Table: React.FC = () => {
+interface TableProps {
+  initialFilter?: 'today' | 'month' | 'range' | 'all';
+  hideControls?: boolean;
+}
+
+const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = false }) => {
   const [data, setData] = useState<GroupedVisit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'today' | 'month' | 'range' | 'all'>('today');
+  const [filter, setFilter] = useState<'today' | 'month' | 'range' | 'all'>(initialFilter);
   const [dateFrom, setDateFrom] = useState<string | null>(null);
   const [dateTo, setDateTo] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);

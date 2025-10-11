@@ -16,7 +16,8 @@ const LoginCard = () => {
     try {
       const data = await login(username, password);
       // If login is successful and token is set, store dept_id and redirect accordingly
-      if (data.user && data.user.adminToken) {
+      // server returns `token` (mapped here to adminToken for compatibility)
+      if (data.user && (data.user.token || data.user.adminToken)) {
         const deptId = data.user.dept_id ?? null;
         // redirect: if dept_id is null -> admin dashboard; otherwise go to department page
         if (deptId === null) {
@@ -41,10 +42,10 @@ const LoginCard = () => {
       if (!res.ok) {
         throw new Error(data.message || 'Login failed');
       }
-      // Store both adminToken and username as a JSON object in localStorage
-      if (data.user && data.user.adminToken) {
+      // Store token under adminToken (backwards-compatible). Server returns `token`.
+      if (data.user && (data.user.token || data.user.adminToken)) {
         localStorage.setItem('adminAuth', JSON.stringify({
-          adminToken: data.user.adminToken,
+          adminToken: data.user.token ?? data.user.adminToken,
           username: data.user.username,
           dept_id: data.user.dept_id ?? null
         }));

@@ -17,10 +17,12 @@ const RegistrationCard = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [createdVisitor, setCreatedVisitor] = useState<any | null>(null);
+  const [finalVisitorsID, setFinalVisitorsID] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
-  const [selectedProfessors, setSelectedProfessors] = useState<{ [office: string]: string }>({});
+  const [selectedProfessors, setSelectedProfessors] = useState<{ [office: string]: number }>({});
   const [offices, setOffices] = useState<{ id: number; name: string }[]>([]);
   const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
 
@@ -75,7 +77,6 @@ const RegistrationCard = () => {
     }));
     setOfficeAvailability(prev => ({ ...prev, ...map }));
   };
-
   useEffect(() => {
     if (selectedOffices.length > 0) {
       // Reset override when selection changes
@@ -85,51 +86,28 @@ const RegistrationCard = () => {
   }, [selectedOffices]);
 
   // Child component for professor select per office
-  const ProfessorSelect: React.FC<{
-    officeId: string;
-    value: string;
-    onChange: (profId: string) => void;
-  }> = ({ officeId, value, onChange }) => {
+  const ProfessorSelect = ({ officeId, value, onChange }: { officeId: string; value: number | string; onChange: (v: number) => void }) => {
     const profFetcher = (url: string) =>
-      fetch(url, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } })
-        .then(async res => {
-          const text = await res.text();
-          if (!res.ok) throw new Error('Failed to fetch: ' + text);
-          if (text.trim().startsWith('<!DOCTYPE html>')) throw new Error('Received HTML instead of JSON.');
-          try {
-            return JSON.parse(text);
-          } catch {
-            throw new Error('Response is not valid JSON: ' + text);
-          }
-        });
-    const { data } = useSWR(
-  `${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/professors/department/${officeId}`,
-      profFetcher,
-      { refreshInterval: 5000 }
-    );
-    const professors = Array.isArray(data)
-      ? data.map((prof: any) => ({ id: prof.id, name: `${prof.first_name} ${prof.middle_name} ${prof.last_name}` }))
-      : [];
+      fetch(url, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } }).then(async res => {
+        const text = await res.text();
+        if (!res.ok) throw new Error('Failed to fetch: ' + text);
+        if (text.trim().startsWith('<!DOCTYPE html>')) throw new Error('Received HTML instead of JSON.');
+        try {
+          return JSON.parse(text);
+        } catch {
+          throw new Error('Response is not valid JSON: ' + text);
+        }
+      });
+
+    const { data: profs } = useSWR(officeId ? `${apiBase}/api/professors?dept_id=${encodeURIComponent(officeId)}` : null, profFetcher);
+
     return (
-      <select
-        className="form-select"
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-        required
-      >
-        <option value="">Select Professor</option>
-        {professors.map(prof => (
-          <option key={prof.id} value={prof.name}>{prof.name}</option>
+      <select className="form-select" value={value || ''} onChange={e => onChange(Number(e.target.value))}>
+        <option value="">Select professor</option>
+        {Array.isArray(profs) && profs.map((p: any) => (
+          <option key={p.id} value={p.id}>{p.name || p.full_name || (p.last_name ? `${p.last_name}, ${p.first_name}` : p.first_name)}</option>
         ))}
       </select>
-    );
-  };
-
-  const handleOfficeChange = (office: string) => {
-    setSelectedOffices(prev =>
-      prev.includes(office)
-        ? prev.filter(o => o !== office)
-        : [...prev, office]
     );
   };
 
@@ -138,9 +116,51 @@ const RegistrationCard = () => {
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    const datePart = `${yyyy}${mm}${dd}`;
-    const randomPart = Math.floor(10000000 + Math.random() * 90000000); // 8 digits
-    return `${datePart}${randomPart}`;
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return `V-${yyyy}${mm}${dd}-${rand}`;
+  };
+
+  const saveVisitor = async (): Promise<string> => {
+    if (finalVisitorsID) return finalVisitorsID;
+    setLoading(true);
+    setError('');
+    setSuccess(false);
+    try {
+      const genId = generateVisitorId();
+      const res = await fetch(`${apiBase}/api/visitorsdata`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitorsID: genId,
+          first_name: firstName,
+          middle_name: middleName,
+          last_name: lastName,
+          address,
+          phone,
+          suffix: '',
+          gender,
+          birth_date: birthDate,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        let detail = text;
+        try { detail = JSON.parse(text).message || text; } catch {}
+        throw new Error(`visitorsdata failed (status ${res.status}): ${detail}`);
+      }
+
+      const created = await res.json().catch(() => null);
+      setCreatedVisitor(created);
+      const id = (created && (created.visitorsID || created.id)) ? (created.visitorsID || created.id) : genId;
+      setFinalVisitorsID(String(id));
+      setLoading(false);
+      return String(id);
+    } catch (err: any) {
+      setLoading(false);
+      setError(err.message || 'Failed to save visitor');
+      throw err;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -148,52 +168,87 @@ const RegistrationCard = () => {
     setLoading(true);
     setError('');
     setSuccess(false);
-    const visitorsID = generateVisitorId();
 
     try {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitorsdata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+
+      // Use existing saved ID if present (from saveVisitor), otherwise create now
+      let visitorsID = finalVisitorsID;
+      if (!visitorsID) {
+        const genId = generateVisitorId();
+        const res = await fetch(`${apiBase}/api/visitorsdata`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-          visitorsID,
-          first_name: firstName,
-          middle_name: middleName,
-          last_name: lastName,
-          address,
-          phone,
-          suffix: '', // or add a suffix field if you want
-          gender,
-          birth_date: birthDate,
-          faculty_to_visit: selectedOffices.map(officeId => {
-            const officeObj = offices.find(o => String(o.id) === officeId);
-            const officeName = officeObj ? officeObj.name : officeId;
-            const profId = selectedProfessors[officeId];
-             return {
-               office: officeName,
-               professor: profId || null,
-               purpose: selectedPurposes[officeId] || null
-             };
+            visitorsID: genId,
+            first_name: firstName,
+            middle_name: middleName,
+            last_name: lastName,
+            address,
+            phone,
+            suffix: '',
+            gender,
+            birth_date: birthDate,
           }),
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to register');
-      // Also insert into /api/visitorlog
-  await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitorslog`, {
+        });
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          let detail = text;
+          try { detail = JSON.parse(text).message || text; } catch {}
+          throw new Error(`visitorsdata failed (status ${res.status}): ${detail}`);
+        }
+
+        const created = await res.json().catch(() => null);
+        visitorsID = (created && (created.visitorsID || created.id)) ? (created.visitorsID || created.id) : genId;
+        setCreatedVisitor(created);
+        setFinalVisitorsID(String(visitorsID));
+      }
+
+      // Create visitor log
+      const logRes = await fetch(`${apiBase}/api/visitorslog`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ visitorsID }),
       });
-      // Optionally, get the created visitor data from the response
-      const data = await res.json();
+
+      if (!logRes.ok) {
+        const text = await logRes.text().catch(() => '');
+        let detail = text;
+        try { detail = JSON.parse(text).message || text; } catch {}
+        throw new Error(`visitorslog failed (status ${logRes.status}): ${detail}`);
+      }
+
+      // Create office_visits records per selected office
+      for (const officeId of selectedOffices) {
+        const dept_id = Number(officeId);
+        const prof_id = selectedProfessors[officeId];
+        const purpose = selectedPurposes[officeId] || '';
+
+        const r = await fetch(`${apiBase}/api/office_visits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visitorsID, dept_id, prof_id, purpose }),
+        });
+
+        if (!r.ok) {
+          const text = await r.text().catch(() => '');
+          let detail = text;
+          try { detail = JSON.parse(text).message || text; } catch {}
+          throw new Error(`office_visits failed for dept_id=${dept_id} (status ${r.status}): ${detail}`);
+        }
+      }
+
       setSuccess(true);
       setFirstName('');
       setMiddleName('');
       setLastName('');
       setGender('Male');
       setBirthDate('');
-  setSelectedOffices([]);
-       setSelectedPurposes({});
-      // Redirect to print layout with visitorID as query param
+      setSelectedOffices([]);
+      setSelectedPurposes({});
+
+      // Redirect to print layout with visitorID as query param (use final id)
       router.push(`/registration/print?page=receipt&visitorID=${visitorsID}`);
     } catch (err: any) {
       setError(err.message || 'Error occurred');
@@ -251,8 +306,18 @@ const RegistrationCard = () => {
                 </select>
               </div>
               <div className="d-flex justify-content-end mt-4">
-                <button type="button" className="btn px-4" onClick={() => setStep(2)}
+                <button type="button" className="btn px-4" onClick={async () => {
+                    if (!isStep1Valid) return;
+                    try {
+                      await saveVisitor();
+                      setStep(2);
+                    } catch (err) {
+                      // saveVisitor already sets error state
+                    }
+                  }}
+                  disabled={!isStep1Valid || loading}
                   style={{ background: '#C8EDF7', color: '#222', fontWeight: 600, border: 'none' }}>
+                  {loading ? <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> : null}
                   Next
                 </button>
               </div>
@@ -267,13 +332,11 @@ const RegistrationCard = () => {
                 <input
                   type="text"
                   className="form-control"
-                  value={
-                    (() => {
-                      const today = new Date();
-                      const options: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
-                      return today.toLocaleDateString(undefined, options);
-                    })()
-                  }
+                  value={(() => {
+                    const today = new Date();
+                    const options: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+                    return today.toLocaleDateString(undefined, options);
+                  })()}
                   readOnly
                 />
               </div>
@@ -293,7 +356,6 @@ const RegistrationCard = () => {
                   placeholder="Select offices..."
                 />
               </div>
-              
               <div className="d-flex justify-content-between mt-4">
                 <button type="button" className="btn btn-secondary px-4" onClick={() => setStep(1)}>
                   Previous
@@ -306,26 +368,24 @@ const RegistrationCard = () => {
             </>
           )}
 
-          {/* Step 3: Offices and Professors */}
+          {/* Step 3: Select professor per office and enter purpose */}
           {step === 3 && (
             <>
               <div className="mb-3">
-                <label className="form-label fw-semibold">Selected Offices and Professors</label>
-                {selectedOffices.length === 0 && <div className="text-muted">No office selected.</div>}
-                    {selectedOffices.map((officeId) => {
-                  const office = offices.find(o => String(o.id) === officeId);
+                {selectedOffices.map(officeId => {
+                  const office = offices.find(o => String(o.id) === String(officeId));
                   return (
                     <div key={officeId} className="mb-3 p-2 border rounded bg-light">
                       <div className="fw-semibold mb-1">{office ? office.name : officeId}</div>
                       <ProfessorSelect
                         officeId={officeId}
-                        value={selectedProfessors[officeId] || ''}
+                        value={selectedProfessors[officeId] ?? ''}
                         onChange={profId => setSelectedProfessors(prev => ({ ...prev, [officeId]: profId }))}
                       />
-                          <div className="mt-2">
-                            <label className="form-label fw-semibold">Purpose for this office</label>
-                            <input type="text" className="form-control" value={selectedPurposes[officeId] || ''} onChange={e => setSelectedPurposes(prev => ({ ...prev, [officeId]: e.target.value }))} required />
-                          </div>
+                      <div className="mt-2">
+                        <label className="form-label fw-semibold">Purpose for this office</label>
+                        <input type="text" className="form-control" value={selectedPurposes[officeId] || ''} onChange={e => setSelectedPurposes(prev => ({ ...prev, [officeId]: e.target.value }))} required />
+                      </div>
                     </div>
                   );
                 })}

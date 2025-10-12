@@ -14,7 +14,8 @@ const DepartmentScanner = () => {
       const raw = localStorage.getItem("adminAuth");
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      return parsed?.dept_id ?? null;
+      // tolerate multiple possible keys (dept_id, department, deptId, department_id)
+      return parsed?.dept_id ?? parsed?.department ?? parsed?.deptId ?? parsed?.department_id ?? null;
     } catch (err) {
       return null;
     }
@@ -70,8 +71,14 @@ const DepartmentScanner = () => {
           // 2) Find visits matching this dept (prefer untagged)
           let matchedVisits: any[] = [];
           if (visits && visits.length) {
+            // debug: log visits shape and deptId to help diagnose mismatches
+            console.debug('DepartmentScanner fetched visits', { visits, deptId });
+
             if (deptId) {
-              matchedVisits = visits.filter((v: any) => String(v.dept_id) === String(deptId));
+              matchedVisits = visits.filter((v: any) => {
+                const visitDept = v.dept_id ?? v.deptId ?? v.department_id ?? v.department ?? v.dept ?? null;
+                return visitDept !== null && String(visitDept) === String(deptId);
+              });
               // prefer untagged first
               matchedVisits = matchedVisits.sort((a: any, b: any) => ((a.qr_tagged ? 1 : 0) - (b.qr_tagged ? 1 : 0)));
             } else {

@@ -202,11 +202,7 @@ const DepartmentScanner = () => {
           <i className="bi bi-upc-scan me-2"></i>Department QR Scanner
         </div>
         <div className="card-body">
-          <div style={{ marginBottom: 8 }}>
-            <strong>adminAuth (raw):</strong>
-            <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', background: '#f7f7f7', padding: 8 }}>{localStorage.getItem('adminAuth') ?? 'not set'}</pre>
-            <button className="btn btn-sm btn-outline-secondary ms-2" onClick={() => { console.log('adminAuth:', localStorage.getItem('adminAuth')); }} style={{ padding: '2px 8px' }}>Show adminAuth (console)</button>
-          </div>
+          {/* adminAuth display removed per request */}
           {showScanner ? (
             <div id="reader-dept" className="mb-3" />
           ) : (

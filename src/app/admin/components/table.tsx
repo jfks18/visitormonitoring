@@ -11,6 +11,7 @@ type OfficeVisitRow = {
   prof_id?: number | string;
   purpose?: string;
   createdAt?: string;
+  qr_tagged?: boolean | null;
 };
 
 type GroupedVisit = {
@@ -24,7 +25,9 @@ type GroupedVisit = {
     professor?: string;
     purpose?: string;
     createdAt?: string;
+    qr_tagged?: boolean | null;
   }>;
+  tagged?: boolean; // any office tagged
 };
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
@@ -64,6 +67,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
   const [dateError, setDateError] = useState('');
   const [showActions, setShowActions] = useState(true);
   const [rangeFetchTrigger, setRangeFetchTrigger] = useState(0);
+  const [selectedGroup, setSelectedGroup] = useState<GroupedVisit | null>(null);
   const router = useRouter();
   const tableRef = useRef<HTMLTableElement | null>(null);
 
@@ -129,6 +133,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
             professor: formatFullName(profMap[String(r.prof_id)]) || '',
             purpose: r.purpose,
             createdAt: r.createdAt,
+            qr_tagged: (r as any).qr_tagged ?? null,
           });
         }
 
@@ -154,6 +159,8 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
             // helpful debug output in browser console to inspect shape
             if (v) console.warn(`No formatted name for visitorsID=${g.visitorsID}`, v);
           }
+          // compute tagged status for the grouped visit
+          g.tagged = g.offices.some(o => o.qr_tagged === true);
         });
 
         setData(groupedArray);
@@ -199,7 +206,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
   const totalPages = Math.max(1, Math.ceil(data.length / rowsPerPage));
 
   const [search, setSearch] = useState('');
-  const filteredData = data.filter(g => (String(g.visitor || '')).toLowerCase().includes(search.toLowerCase()));
+  const filteredData = data.filter(g => (String(g.visitor || g.visitorsID || '')).toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div style={{ padding: '0', background: 'none' }}>
@@ -239,9 +246,9 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
                   </thead>
                   <tbody>
                     {filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((g, idx) => (
-                      <tr key={`${g.visitorsID}-${g.date}-${idx}`} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <tr key={`${g.visitorsID}-${g.date}-${idx}`} style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }} onClick={() => { setSelectedGroup(g); }}>
                         <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500 }}>{g.visitorsID}</td>
-                        <td style={{ padding: '14px 8px', color: '#222', fontWeight: 500 }}>{g.visitor ?? '-'}</td>
+                        <td style={{ padding: '14px 8px', color: '#222', fontWeight: 500 }}>{g.visitor ?? g.visitorsID}</td>
                         <td style={{ padding: '14px 8px', color: '#666' }}>{g.date}</td>
                         <td style={{ padding: '14px 8px' }}>
                           {g.offices.map((o, oi) => (
@@ -252,7 +259,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
                           ))}
                         </td>
                         <td style={{ padding: '14px 8px' }}>
-                          <button className="btn btn-link p-0" style={{ color: '#22577A' }} title="Print Visitor Pass" onClick={() => router.push(`/registration/print?visitorID=${g.visitorsID}`)}>
+                          <button className="btn btn-link p-0" style={{ color: '#22577A' }} title="Print Visitor Pass" onClick={(e) => { e.stopPropagation(); router.push(`/registration/print?visitorID=${g.visitorsID}`); }}>
                             <i className="bi bi-printer" style={{ fontSize: 18 }}></i>
                           </button>
                         </td>
@@ -292,6 +299,50 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
                   <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Details modal for selected grouped visit */}
+      {selectedGroup && (
+        <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
+          <div className="modal-dialog modal-xl modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Visit details — {selectedGroup.visitorsID} ({selectedGroup.date})</h5>
+                <button type="button" className="btn-close" onClick={() => setSelectedGroup(null)}></button>
+              </div>
+              <div className="modal-body">
+                <div style={{ marginBottom: 12 }}><strong>Visitor:</strong> {selectedGroup.visitor ?? selectedGroup.visitorsID}</div>
+                <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Office</th>
+                        <th>Professor</th>
+                        <th>Purpose</th>
+                        <th>Time</th>
+                        <th>QR Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedGroup.offices.map((o, i) => (
+                        <tr key={i}>
+                          <td>{o.office}</td>
+                          <td>{o.professor || ''}</td>
+                          <td>{o.purpose || ''}</td>
+                          <td>{o.createdAt ? toManilaDateTime(o.createdAt) : '-'}</td>
+                          <td>{o.qr_tagged ? 'qr_tagged' : 'not visited'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setSelectedGroup(null)}>Close</button>
+              </div>
             </div>
           </div>
         </div>

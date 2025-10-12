@@ -7,6 +7,7 @@ const DepartmentScanner = () => {
   const [showScanner, setShowScanner] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [debugVisits, setDebugVisits] = useState<any[] | null>(null);
 
   // Try to get dept_id from localStorage.adminAuth
   const getDeptId = () => {
@@ -74,13 +75,27 @@ const DepartmentScanner = () => {
             // debug: log visits shape and deptId to help diagnose mismatches
             console.debug('DepartmentScanner fetched visits', { visits, deptId });
 
+            // prepare a lightweight debug view for the UI
+            try {
+              const visitsDebug = visits.map((v: any) => ({
+                id: v.id ?? null,
+                visitorsID: v.visitorsID ?? v.visitorsId ?? null,
+                visitDept: v.dept_id ?? v.deptId ?? v.department_id ?? v.department ?? v.dept ?? null,
+                qr_tagged: v.qr_tagged ?? null,
+                createdAt: v.createdAt ?? null,
+              }));
+              setDebugVisits(visitsDebug);
+            } catch (e) {
+              setDebugVisits(null);
+            }
+
             if (deptId) {
               matchedVisits = visits.filter((v: any) => {
                 const visitDept = v.dept_id ?? v.deptId ?? v.department_id ?? v.department ?? v.dept ?? null;
                 return visitDept !== null && String(visitDept) === String(deptId);
               });
-              // prefer untagged first
-              matchedVisits = matchedVisits.sort((a: any, b: any) => ((a.qr_tagged ? 1 : 0) - (b.qr_tagged ? 1 : 0)));
+                // prefer untagged first
+                matchedVisits = matchedVisits.sort((a: any, b: any) => ((a.qr_tagged ? 1 : 0) - (b.qr_tagged ? 1 : 0)));
             } else {
               matchedVisits = visits;
             }
@@ -119,6 +134,7 @@ const DepartmentScanner = () => {
 
             setMessage('Visitor verified and QR tagged for department');
             setErrorMessage(null);
+            setDebugVisits(null);
           } else {
             setMessage(null);
             setErrorMessage('No appointment found for this visitor in your department');
@@ -168,6 +184,21 @@ const DepartmentScanner = () => {
               <button className="btn btn-outline-primary mt-3" onClick={() => setShowScanner(true)}>
                 <i className="bi bi-arrow-clockwise me-1"></i>Scan Again
               </button>
+              {debugVisits && errorMessage && (
+                <div className="mt-3 text-start" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Debug: fetched visits</div>
+                  <table className="table table-sm">
+                    <thead>
+                      <tr><th>id</th><th>visitorsID</th><th>visitDept</th><th>qr_tagged</th><th>createdAt</th></tr>
+                    </thead>
+                    <tbody>
+                      {debugVisits.map((v, i) => (
+                        <tr key={i}><td>{v.id}</td><td>{v.visitorsID}</td><td>{v.visitDept}</td><td>{String(v.qr_tagged)}</td><td>{v.createdAt}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
           {scannerResult && showScanner && (

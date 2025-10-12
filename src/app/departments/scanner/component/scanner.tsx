@@ -22,6 +22,22 @@ const DepartmentScanner = () => {
     }
   };
 
+  // scanner lock helpers (prevent multiple active scanners)
+  const SCANNER_LOCK_KEY = 'scannerActiveLock_v1';
+  const LOCK_TTL_MS = 60 * 1000; // 60 seconds freshness window
+  const getScannerLock = () => {
+    try {
+      const raw = localStorage.getItem(SCANNER_LOCK_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed;
+    } catch (e) { return null; }
+  };
+  const setScannerLock = () => {
+    try { localStorage.setItem(SCANNER_LOCK_KEY, JSON.stringify({ active: true, ts: Date.now() })); } catch (e) {}
+  };
+  const clearScannerLock = () => { try { localStorage.removeItem(SCANNER_LOCK_KEY); } catch (e) {} };
+
   useEffect(() => {
     if (!showScanner && (message || errorMessage)) {
       const timer = setTimeout(() => {
@@ -35,6 +51,16 @@ const DepartmentScanner = () => {
 
   useEffect(() => {
     if (!showScanner) return;
+    // Prevent multiple scanners: check lock
+    const existingLock = getScannerLock();
+    if (existingLock && (Date.now() - (existingLock.ts || 0) < LOCK_TTL_MS)) {
+      // another scanner likely active — do not render
+      setErrorMessage('Another scanner is active. Please try again in a moment.');
+      setShowScanner(false);
+      return;
+    }
+    setScannerLock();
+
     const scanner = new Html5QrcodeScanner(
       "reader-dept",
       {
@@ -50,7 +76,7 @@ const DepartmentScanner = () => {
       setScannerResult(result);
       setShowScanner(false);
       try {
-        const deptId = getDeptId();
+  const deptId = getDeptId();
         // Instead of updating visitorslog, directly mark the visitor's office_visit(s) as tagged for this department
         try {
           const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
@@ -101,7 +127,7 @@ const DepartmentScanner = () => {
             }
           }
 
-          if (matchedVisits.length) {
+            if (matchedVisits.length) {
             // Update each matched visit's qr_tagged = 1. Prefer updating by visitorsID endpoint if server supports dept filter.
             // We'll call the by-visitors PUT once with dept_id to update the latest for that dept (server-side behavior expected),
             // but also attempt per-id updates if available.
@@ -135,10 +161,13 @@ const DepartmentScanner = () => {
             setMessage('Visitor verified and QR tagged for department');
             setErrorMessage(null);
             setDebugVisits(null);
+            // clear lock after successful scan
+            clearScannerLock();
           } else {
             setMessage(null);
             setErrorMessage('No appointment found for this visitor in your department');
             console.info('No matching office_visit found for visitor', trimmedResult, 'dept', deptId);
+            clearScannerLock();
           }
         } catch (err) {
           setMessage(null);
@@ -149,6 +178,7 @@ const DepartmentScanner = () => {
         setScannerResult(null);
         setErrorMessage("Failed to process scan.");
         console.error("Failed to process scan:", err);
+        clearScannerLock();
       }
     }
 
@@ -158,8 +188,9 @@ const DepartmentScanner = () => {
 
     scanner.render(success, error);
 
-    // Cleanup on unmount
+    // Cleanup on unmount: clear scanner and lock
     return () => {
+      clearScannerLock();
       scanner.clear().catch(() => {});
     };
   }, [showScanner]);
@@ -172,7 +203,8 @@ const DepartmentScanner = () => {
         </div>
         <div className="card-body">
           <div style={{ marginBottom: 8 }}>
-            <strong>Your dept id:</strong> <span style={{ color: '#22577A' }}>{getDeptId() ?? 'not set'}</span>
+            <strong>adminAuth (raw):</strong>
+            <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', background: '#f7f7f7', padding: 8 }}>{localStorage.getItem('adminAuth') ?? 'not set'}</pre>
             <button className="btn btn-sm btn-outline-secondary ms-2" onClick={() => { console.log('adminAuth:', localStorage.getItem('adminAuth')); }} style={{ padding: '2px 8px' }}>Show adminAuth (console)</button>
           </div>
           {showScanner ? (

@@ -351,9 +351,7 @@ const RegistrationCard = () => {
               <div className="mb-3">
                 <label className="form-label fw-semibold d-flex align-items-center" style={{ gap: 8 }}>
                   Offices to Visit
-                  <button type="button" className="btn btn-sm btn-outline-secondary" style={{ padding: '2px 8px', fontSize: 14 }} onClick={() => refreshOffices()} title="Refresh offices">
-                    <i className="bi bi-arrow-clockwise"></i> Refresh
-                  </button>
+                 
                 </label>
                 <Select
                   isMulti

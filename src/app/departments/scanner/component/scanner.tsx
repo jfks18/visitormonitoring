@@ -67,6 +67,60 @@ const DepartmentScanner = () => {
         } else {
           setMessage(data.message || "Scan success");
           setErrorMessage(null);
+
+          // Additional: check visitor data and appointments for this department, then mark qr_tagged = 1
+          try {
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+
+            // 1) Ensure visitor exists (optional but helpful)
+            const vresp = await fetch(`${apiBase}/api/visitorsdata/${encodeURIComponent(trimmedResult)}`);
+            if (!vresp.ok) {
+              // visitor record not found — still proceed to mark if there's an office_visit
+              console.warn('visitorsdata not found for', trimmedResult);
+            }
+
+            // 2) Fetch office_visits for this visitor (try query param; fallback to fetching all and filtering)
+            let visits: any[] = [];
+            try {
+              const ovRes = await fetch(`${apiBase}/api/office_visits?visitorsID=${encodeURIComponent(trimmedResult)}`);
+              if (ovRes.ok) visits = await ovRes.json().catch(() => []);
+              else {
+                // fallback: get all and filter
+                const allRes = await fetch(`${apiBase}/api/office_visits`);
+                const all = allRes.ok ? await allRes.json().catch(() => []) : [];
+                visits = Array.isArray(all) ? all.filter((r: any) => String(r.visitorsID) === String(trimmedResult)) : [];
+              }
+            } catch (err) {
+              console.warn('Failed to fetch office_visits:', err);
+            }
+
+            // 3) Find a visit matching this dept (prefer untagged)
+            let matched = null;
+            if (visits && visits.length) {
+              matched = visits.find((v: any) => deptId && String(v.dept_id) === String(deptId) && !(v.qr_tagged === 1 || v.qr_tagged === true));
+              if (!matched) matched = visits.find((v: any) => deptId ? String(v.dept_id) === String(deptId) : true);
+            }
+
+            if (matched) {
+              // Call PUT to update latest office_visit for this visitor — include dept and set qr_tagged
+              const putRes = await fetch(`${apiBase}/api/office_visits/by-visitors/${encodeURIComponent(trimmedResult)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dept_id: deptId ?? matched.dept_id, qr_tagged: 1 }),
+              });
+
+              if (!putRes.ok) {
+                const t = await putRes.text().catch(() => '');
+                console.warn('Failed to mark qr_tagged:', t);
+              } else {
+                console.info('Marked qr_tagged for visitor', trimmedResult);
+              }
+            } else {
+              console.info('No matching office_visit found for visitor', trimmedResult, 'dept', deptId);
+            }
+          } catch (err) {
+            console.error('Error during post-scan visit check:', err);
+          }
         }
       } catch (err) {
         setScannerResult(null);

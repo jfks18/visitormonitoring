@@ -101,10 +101,18 @@ const RegistrationCard = () => {
 
     const { data: profs } = useSWR(officeId ? `${apiBase}/api/professors?dept_id=${encodeURIComponent(officeId)}` : null, profFetcher);
 
+    // defensively filter professors by dept id on the client in case the API doesn't support filtering
+    const filteredProfs = Array.isArray(profs)
+      ? profs.filter((p: any) => {
+          const pid = p.dept_id ?? p.deptId ?? p.department_id ?? p.department ?? null;
+          return pid !== null && String(pid) === String(officeId);
+        })
+      : [];
+
     return (
       <select className="form-select" value={value || ''} onChange={e => onChange(Number(e.target.value))}>
         <option value="">Select professor</option>
-        {Array.isArray(profs) && profs.map((p: any) => (
+        {filteredProfs.map((p: any) => (
           <option key={p.id} value={p.id}>{p.name || p.full_name || (p.last_name ? `${p.last_name}, ${p.first_name}` : p.first_name)}</option>
         ))}
       </select>

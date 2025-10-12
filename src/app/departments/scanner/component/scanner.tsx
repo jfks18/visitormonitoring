@@ -49,78 +49,78 @@ const DepartmentScanner = () => {
       setShowScanner(false);
       try {
         const deptId = getDeptId();
-        const payload: any = { visitorsID: trimmedResult };
-        if (deptId) payload.dept_id = deptId;
+        // Instead of updating visitorslog, directly mark the visitor's office_visit(s) as tagged for this department
+        try {
+          const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
 
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/visitorslog/scan`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }
-        );
-        const data = await response.json();
-        if (!response.ok) {
-          setScannerResult(null);
-          setErrorMessage(data.message || "Scan failed");
-        } else {
-          setMessage(data.message || "Scan success");
-          setErrorMessage(null);
-
-          // Additional: check visitor data and appointments for this department, then mark qr_tagged = 1
+          // 1) Fetch office_visits for this visitor (prefer visitorsID query, fallback to all and filter)
+          let visits: any[] = [];
           try {
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
-
-            // 1) Ensure visitor exists (optional but helpful)
-            const vresp = await fetch(`${apiBase}/api/visitorsdata/${encodeURIComponent(trimmedResult)}`);
-            if (!vresp.ok) {
-              // visitor record not found — still proceed to mark if there's an office_visit
-              console.warn('visitorsdata not found for', trimmedResult);
-            }
-
-            // 2) Fetch office_visits for this visitor (try query param; fallback to fetching all and filtering)
-            let visits: any[] = [];
-            try {
-              const ovRes = await fetch(`${apiBase}/api/office_visits?visitorsID=${encodeURIComponent(trimmedResult)}`);
-              if (ovRes.ok) visits = await ovRes.json().catch(() => []);
-              else {
-                // fallback: get all and filter
-                const allRes = await fetch(`${apiBase}/api/office_visits`);
-                const all = allRes.ok ? await allRes.json().catch(() => []) : [];
-                visits = Array.isArray(all) ? all.filter((r: any) => String(r.visitorsID) === String(trimmedResult)) : [];
-              }
-            } catch (err) {
-              console.warn('Failed to fetch office_visits:', err);
-            }
-
-            // 3) Find a visit matching this dept (prefer untagged)
-            let matched = null;
-            if (visits && visits.length) {
-              matched = visits.find((v: any) => deptId && String(v.dept_id) === String(deptId) && !(v.qr_tagged === 1 || v.qr_tagged === true));
-              if (!matched) matched = visits.find((v: any) => deptId ? String(v.dept_id) === String(deptId) : true);
-            }
-
-            if (matched) {
-              // Call PUT to update latest office_visit for this visitor — include dept and set qr_tagged
-              const putRes = await fetch(`${apiBase}/api/office_visits/by-visitors/${encodeURIComponent(trimmedResult)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dept_id: deptId ?? matched.dept_id, qr_tagged: 1 }),
-              });
-
-              if (!putRes.ok) {
-                const t = await putRes.text().catch(() => '');
-                console.warn('Failed to mark qr_tagged:', t);
-              } else {
-                console.info('Marked qr_tagged for visitor', trimmedResult);
-              }
-            } else {
-              console.info('No matching office_visit found for visitor', trimmedResult, 'dept', deptId);
+            const ovRes = await fetch(`${apiBase}/api/office_visits?visitorsID=${encodeURIComponent(trimmedResult)}`);
+            if (ovRes.ok) visits = await ovRes.json().catch(() => []);
+            else {
+              const allRes = await fetch(`${apiBase}/api/office_visits`);
+              const all = allRes.ok ? await allRes.json().catch(() => []) : [];
+              visits = Array.isArray(all) ? all.filter((r: any) => String(r.visitorsID) === String(trimmedResult)) : [];
             }
           } catch (err) {
-            console.error('Error during post-scan visit check:', err);
+            console.warn('Failed to fetch office_visits:', err);
           }
+
+          // 2) Find visits matching this dept (prefer untagged)
+          let matchedVisits: any[] = [];
+          if (visits && visits.length) {
+            if (deptId) {
+              matchedVisits = visits.filter((v: any) => String(v.dept_id) === String(deptId));
+              // prefer untagged first
+              matchedVisits = matchedVisits.sort((a: any, b: any) => ((a.qr_tagged ? 1 : 0) - (b.qr_tagged ? 1 : 0)));
+            } else {
+              matchedVisits = visits;
+            }
+          }
+
+          if (matchedVisits.length) {
+            // Update each matched visit's qr_tagged = 1. Prefer updating by visitorsID endpoint if server supports dept filter.
+            // We'll call the by-visitors PUT once with dept_id to update the latest for that dept (server-side behavior expected),
+            // but also attempt per-id updates if available.
+            // Try by-visitors PUT first (simple):
+            const byVisitorsRes = await fetch(`${apiBase}/api/office_visits/by-visitors/${encodeURIComponent(trimmedResult)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dept_id: deptId ?? matchedVisits[0].dept_id, qr_tagged: 1 }),
+            });
+
+            if (!byVisitorsRes.ok) {
+              console.warn('by-visitors PUT failed, trying per-visit updates');
+              // fallback: update per visit id
+              for (const mv of matchedVisits) {
+                try {
+                  const resId = await fetch(`${apiBase}/api/office_visits/${encodeURIComponent(mv.id)}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qr_tagged: 1 }),
+                  });
+                  if (!resId.ok) {
+                    const t = await resId.text().catch(() => '');
+                    console.warn('Failed updating visit id', mv.id, t);
+                  }
+                } catch (err) {
+                  console.warn('Error updating visit id', mv.id, err);
+                }
+              }
+            } else {
+              console.info('Marked qr_tagged via by-visitors endpoint for', trimmedResult);
+            }
+
+            setMessage('Visitor verified and QR tagged for department');
+            setErrorMessage(null);
+          } else {
+            setMessage(null);
+            setErrorMessage('No appointment found for this visitor in your department');
+            console.info('No matching office_visit found for visitor', trimmedResult, 'dept', deptId);
+          }
+        } catch (err) {
+          setMessage(null);
+          setErrorMessage('Failed to mark visit as tagged');
+          console.error('Error updating visit tag:', err);
         }
       } catch (err) {
         setScannerResult(null);

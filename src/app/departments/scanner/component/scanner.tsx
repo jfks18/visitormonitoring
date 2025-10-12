@@ -155,6 +155,10 @@ const DepartmentScanner = () => {
           <i className="bi bi-upc-scan me-2"></i>Department QR Scanner
         </div>
         <div className="card-body">
+          <div style={{ marginBottom: 8 }}>
+            <strong>Your dept id:</strong> <span style={{ color: '#22577A' }}>{getDeptId() ?? 'not set'}</span>
+            <button className="btn btn-sm btn-outline-secondary ms-2" onClick={() => { console.log('adminAuth:', localStorage.getItem('adminAuth')); }} style={{ padding: '2px 8px' }}>Show adminAuth (console)</button>
+          </div>
           {showScanner ? (
             <div id="reader-dept" className="mb-3" />
           ) : (

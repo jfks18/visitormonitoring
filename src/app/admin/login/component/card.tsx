@@ -15,16 +15,40 @@ const LoginCard = () => {
     setError('');
     try {
       const data = await login(username, password);
-      // If login is successful and token is set, store dept_id and redirect accordingly
-      // server returns `token` (mapped here to adminToken for compatibility)
+      // Role-based routing (numeric roles: 1=admin, 2=professor, 3=department)
       if (data.user && (data.user.token || data.user.adminToken)) {
+        const rawRole = data.user.role_id ?? data.user.role ?? data.user.user_role ?? data.user.type;
+        const roleCode = typeof rawRole === 'number' ? rawRole : Number(rawRole);
+        // Debug: log role values returned from backend
+        try {
+          console.log('[Login] rawRole:', rawRole, '| roleCode:', roleCode, '| user.id:', data.user?.id, '| dept_id:', data.user?.dept_id);
+        } catch {}
         const deptId = data.user.dept_id ?? null;
-        // redirect: if dept_id is null -> admin dashboard; otherwise go to department page
-        if (deptId === null) {
-          router.replace('/admin/dashboard');
-        } else {
-          router.replace('/departments');
+        const userId = data.user.id ?? data.user.prof_id ?? data.user.user_id ?? null;
+
+        // Build a unified auth object and store under adminAuth (for backward compatibility)
+        const authPayload = {
+          adminToken: data.user.token ?? data.user.adminToken,
+          username: data.user.username,
+          role: rawRole, // store numeric role
+          dept_id: deptId,
+          user_id: userId,
+        } as any;
+        try { localStorage.setItem('adminAuth', JSON.stringify(authPayload)); } catch {}
+
+        // If faculty (role 2), also store a facultyAuth for faculty pages convenience
+        if (rawRole === 2) {
+          try { localStorage.setItem('facultyAuth', JSON.stringify({ token: authPayload.adminToken, username: authPayload.username, id: userId, role: roleCode })); } catch {}
         }
+
+        // Redirect by numeric role
+        if (rawRole === 1) {
+          router.replace('/admin/dashboard');
+        } else if (rawRole === 2) {
+          router.replace('/faculty/visitors');
+        } else if (rawRole === 3) {
+          router.replace('/departments/professor');
+        } 
       }
     } catch (err: any) {
       setError(err.message);
@@ -42,14 +66,7 @@ const LoginCard = () => {
       if (!res.ok) {
         throw new Error(data.message || 'Login failed');
       }
-      // Store token under adminToken (backwards-compatible). Server returns `token`.
-      if (data.user && (data.user.token || data.user.adminToken)) {
-        localStorage.setItem('adminAuth', JSON.stringify({
-          adminToken: data.user.token ?? data.user.adminToken,
-          username: data.user.username,
-          dept_id: data.user.dept_id ?? null
-        }));
-      }
+      // Store happens in handleSubmit after we have the full user payload and role mapping
       return data;
     } catch (err: any) {
       throw new Error(err.message || 'Login failed');

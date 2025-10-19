@@ -76,103 +76,35 @@ const DepartmentScanner = () => {
       setScannerResult(result);
       setShowScanner(false);
       try {
-  const deptId = getDeptId();
-        // Instead of updating visitorslog, directly mark the visitor's office_visit(s) as tagged for this department
+        const deptId = getDeptId();
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+        // Call the new scan endpoint which will validate dept and tag the latest visit
+        const resp = await fetch(`${apiBase}/api/office_visits/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ visitorsID: trimmedResult, dept_id: deptId }),
+        });
+
+        let data: any = {};
+        let textBody = '';
         try {
-          const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+          textBody = await resp.text();
+          try { data = JSON.parse(textBody); } catch (e) { data = { message: textBody }; }
+        } catch (e) {
+          data = {};
+        }
 
-          // 1) Fetch office_visits for this visitor (prefer visitorsID query, fallback to all and filter)
-          let visits: any[] = [];
-          try {
-            const ovRes = await fetch(`${apiBase}/api/office_visits?visitorsID=${encodeURIComponent(trimmedResult)}`);
-            if (ovRes.ok) visits = await ovRes.json().catch(() => []);
-            else {
-              const allRes = await fetch(`${apiBase}/api/office_visits`);
-              const all = allRes.ok ? await allRes.json().catch(() => []) : [];
-              visits = Array.isArray(all) ? all.filter((r: any) => String(r.visitorsID) === String(trimmedResult)) : [];
-            }
-          } catch (err) {
-            console.warn('Failed to fetch office_visits:', err);
-          }
-
-          // 2) Find visits matching this dept (prefer untagged)
-          let matchedVisits: any[] = [];
-          if (visits && visits.length) {
-            // debug: log visits shape and deptId to help diagnose mismatches
-            console.debug('DepartmentScanner fetched visits', { visits, deptId });
-
-            // prepare a lightweight debug view for the UI
-            try {
-              const visitsDebug = visits.map((v: any) => ({
-                id: v.id ?? null,
-                visitorsID: v.visitorsID ?? v.visitorsId ?? null,
-                visitDept: v.dept_id ?? v.deptId ?? v.department_id ?? v.department ?? v.dept ?? null,
-                qr_tagged: v.qr_tagged ?? null,
-                createdAt: v.createdAt ?? null,
-              }));
-              setDebugVisits(visitsDebug);
-            } catch (e) {
-              setDebugVisits(null);
-            }
-
-            if (deptId) {
-              matchedVisits = visits.filter((v: any) => {
-                const visitDept = v.dept_id ?? v.deptId ?? v.department_id ?? v.department ?? v.dept ?? null;
-                return visitDept !== null && String(visitDept) === String(deptId);
-              });
-                // prefer untagged first
-                matchedVisits = matchedVisits.sort((a: any, b: any) => ((a.qr_tagged ? 1 : 0) - (b.qr_tagged ? 1 : 0)));
-            } else {
-              matchedVisits = visits;
-            }
-          }
-
-            if (matchedVisits.length) {
-            // Update each matched visit's qr_tagged = 1. Prefer updating by visitorsID endpoint if server supports dept filter.
-            // We'll call the by-visitors PUT once with dept_id to update the latest for that dept (server-side behavior expected),
-            // but also attempt per-id updates if available.
-            // Try by-visitors PUT first (simple):
-            const byVisitorsRes = await fetch(`${apiBase}/api/office_visits/by-visitors/${encodeURIComponent(trimmedResult)}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ dept_id: deptId ?? matchedVisits[0].dept_id, qr_tagged: 1 }),
-            });
-
-            if (!byVisitorsRes.ok) {
-              console.warn('by-visitors PUT failed, trying per-visit updates');
-              // fallback: update per visit id
-              for (const mv of matchedVisits) {
-                try {
-                  const resId = await fetch(`${apiBase}/api/office_visits/${encodeURIComponent(mv.id)}`, {
-                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qr_tagged: 1 }),
-                  });
-                  if (!resId.ok) {
-                    const t = await resId.text().catch(() => '');
-                    console.warn('Failed updating visit id', mv.id, t);
-                  }
-                } catch (err) {
-                  console.warn('Error updating visit id', mv.id, err);
-                }
-              }
-            } else {
-              console.info('Marked qr_tagged via by-visitors endpoint for', trimmedResult);
-            }
-
-            setMessage('Visitor verified and QR tagged for department');
-            setErrorMessage(null);
-            setDebugVisits(null);
-            // clear lock after successful scan
-            clearScannerLock();
-          } else {
-            setMessage(null);
-            setErrorMessage('No appointment found for this visitor in your department');
-            console.info('No matching office_visit found for visitor', trimmedResult, 'dept', deptId);
-            clearScannerLock();
-          }
-        } catch (err) {
+        if (!resp.ok) {
+          // surface backend status and message in the UI for debugging
+          const backendMessage = data?.message || textBody || `HTTP ${resp.status}`;
           setMessage(null);
-          setErrorMessage('Failed to mark visit as tagged');
-          console.error('Error updating visit tag:', err);
+          setErrorMessage(`${backendMessage} (status ${resp.status})`);
+          clearScannerLock();
+        } else {
+          setMessage(data.message || 'Visitor verified and QR tagged for department');
+          setErrorMessage(null);
+          setDebugVisits(null);
+          clearScannerLock();
         }
       } catch (err) {
         setScannerResult(null);
@@ -196,39 +128,24 @@ const DepartmentScanner = () => {
   }, [showScanner]);
 
   return (
-    <div className="d-flex align-items-center justify-content-center min-vh-100" style={{ background: '#e3f6fd' }}>
+    <div className="d-flex align-items-center justify-content-center min-vh-100 bg-light">
       <div className="card shadow-lg p-4" style={{ maxWidth: 500, width: '100%' }}>
         <div className="card-header bg-primary text-white text-center fs-5 fw-bold rounded-top">
-          <i className="bi bi-upc-scan me-2"></i>Department QR Scanner
+          <i className="bi bi-upc-scan me-2"></i>QR Code Scanner
         </div>
         <div className="card-body">
-          {/* adminAuth display removed per request */}
           {showScanner ? (
             <div id="reader-dept" className="mb-3" />
           ) : (
             <div className="text-center my-4">
               {message && <div className="alert alert-success d-flex align-items-center justify-content-center"><i className="bi bi-check-circle-fill me-2"></i>{message}</div>}
               {errorMessage && <div className="alert alert-danger d-flex align-items-center justify-content-center"><i className="bi bi-x-circle-fill me-2"></i>{errorMessage}</div>}
-              <button className="btn btn-outline-primary mt-3" onClick={() => setShowScanner(true)}>
+              <button className="btn btn-outline-primary mt-3" onClick={() => { setShowScanner(true); setMessage(null); setErrorMessage(null); }}>
                 <i className="bi bi-arrow-clockwise me-1"></i>Scan Again
               </button>
-              {debugVisits && errorMessage && (
-                <div className="mt-3 text-start" style={{ maxHeight: 220, overflowY: 'auto' }}>
-                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Debug: fetched visits</div>
-                  <table className="table table-sm">
-                    <thead>
-                      <tr><th>id</th><th>visitorsID</th><th>visitDept</th><th>qr_tagged</th><th>createdAt</th></tr>
-                    </thead>
-                    <tbody>
-                      {debugVisits.map((v, i) => (
-                        <tr key={i}><td>{v.id}</td><td>{v.visitorsID}</td><td>{v.visitDept}</td><td>{String(v.qr_tagged)}</td><td>{v.createdAt}</td></tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
           )}
+
           {scannerResult && showScanner && (
             <div className="alert alert-info mt-3 text-center">
               <i className="bi bi-qr-code me-2"></i>

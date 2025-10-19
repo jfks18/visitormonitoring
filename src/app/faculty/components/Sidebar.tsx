@@ -9,21 +9,20 @@ const Sidebar = () => {
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     try {
-  await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/logout`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/logout`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       });
-      localStorage.removeItem('adminAuth');
-      router.replace('/admin/login');
-    } catch (err) {
-      alert('Logout failed.');
-    }
+    } catch {}
+    try { localStorage.removeItem('facultyAuth'); } catch {}
+    try { localStorage.removeItem('adminAuth'); } catch {}
+    router.replace('/admin/login');
   };
 
   const menu = [
-    { label: 'Professor', path: '/departments/professor' },
-
+    { label: 'Visitors Log', path: '/faculty/visitors' },
+    { label: 'Profile', path: '/faculty/profile' },
   ];
 
   return (
@@ -47,16 +46,13 @@ const Sidebar = () => {
       </div>
       <nav style={{ width: '100%' }}>
         <ul style={{ listStyle: 'none', padding: 0, width: '100%' }}>
-          {menu.map((item, idx) => {
+          {menu.map((item) => {
             const isActive = pathname === item.path;
             return (
               <li key={item.label} style={{ margin: '8px 0' }}>
                 <a
                   href="#"
-                  onClick={e => {
-                    e.preventDefault();
-                    if (item.path !== '#') router.push(item.path);
-                  }}
+                  onClick={e => { e.preventDefault(); if (item.path !== '#') router.push(item.path); }}
                   style={{
                     display: 'block',
                     padding: '10px 24px',

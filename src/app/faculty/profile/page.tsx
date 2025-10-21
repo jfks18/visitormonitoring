@@ -25,6 +25,8 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Resolve professor id (professors.id) from localStorage
   const getProfessorId = (): number | null => {
@@ -35,7 +37,7 @@ const ProfilePage = () => {
       const a = rawA ? JSON.parse(rawA) : null;
       const pick = (o: any) => {
         if (!o) return null;
-        const v = o.prof_id ?? null; // new endpoint expects professor id
+        const v = o.user_id ?? null; // new endpoint expects professor id
         if (typeof v === 'number') return v;
         if (typeof v === 'string' && v) return Number(v);
         return null;
@@ -80,13 +82,9 @@ const ProfilePage = () => {
       if (data.email !== undefined) userPayload.email = data.email;
       if (data.phone !== undefined) userPayload.phone = data.phone;
       if (data.status !== undefined) userPayload.status = data.status;
-
-      const professorPayload: any = {};
-      if (data.prof_email !== undefined) professorPayload.email = data.prof_email;
-
+      if (newPassword && newPassword.trim() !== '') userPayload.password = newPassword.trim();
       const body: any = { };
       if (Object.keys(userPayload).length > 0) body.user = userPayload;
-      if (Object.keys(professorPayload).length > 0) body.professor = professorPayload;
 
       const res = await fetch(`${apiBase}/api/professor-users/by-professor/${encodeURIComponent(String(profIdParam))}`, {
         method: 'PUT',
@@ -96,6 +94,7 @@ const ProfilePage = () => {
       const t = await res.text();
       if (!res.ok) throw new Error(t || 'Failed to save profile');
       alert('Profile updated');
+      setNewPassword('');
     } catch (err: any) {
       setError(err.message || 'Failed to save');
     } finally { setSaving(false); }
@@ -151,25 +150,24 @@ const ProfilePage = () => {
                         </div>
                       </div>
                       <div className="col-md-6">
-                        <div className="fw-bold mb-2" style={{ color: '#22577A' }}>Professor</div>
+                        <div className="fw-bold mb-2" style={{ color: '#22577A' }}>Security</div>
                         <div className="row g-3">
-                          <div className="col-md-4">
-                            <label className="form-label">First Name</label>
-                            <input className="form-control" value={data.first_name || ''} disabled />
+                          <div className="col-md-8">
+                            <label className="form-label">New Password</label>
+                            <div className="input-group">
+                              <input
+                                className="form-control"
+                                type={showPassword ? 'text' : 'password'}
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                placeholder="Leave blank to keep current"
+                              />
+                              <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPassword(v => !v)}>
+                                {showPassword ? 'Hide' : 'Show'}
+                              </button>
+                            </div>
+                            <div style={{ fontSize: 12, color: '#666' }}>Password will update on save. Leave blank to keep the current password.</div>
                           </div>
-                          <div className="col-md-4">
-                            <label className="form-label">Middle Name</label>
-                            <input className="form-control" value={data.middle_name || ''} disabled />
-                          </div>
-                          <div className="col-md-4">
-                            <label className="form-label">Last Name</label>
-                            <input className="form-control" value={data.last_name || ''} disabled />
-                          </div>
-                          <div className="col-md-6">
-                            <label className="form-label">Professor Email</label>
-                            <input type="email" className="form-control" value={data.prof_email || ''} onChange={e => setData({ ...data, prof_email: e.target.value })} />
-                          </div>
-                          {/** Department field removed per request */}
                         </div>
                       </div>
                     </div>

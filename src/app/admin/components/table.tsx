@@ -85,6 +85,21 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
   const tableRef = useRef<HTMLTableElement | null>(null);
   const openGroupModal = useOpenGroupModal(setSelectedGroup, setModalLoading, apiBase);
 
+  // Track Manila calendar day (YYYY-MM-DD) and auto-refresh at Manila midnight
+  const getManilaYMD = () => {
+    try {
+      return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+    } catch { return new Date().toISOString().slice(0, 10); }
+  };
+  const [manilaDay, setManilaDay] = useState<string>(getManilaYMD());
+  useEffect(() => {
+    const id = setInterval(() => {
+      const ymd = getManilaYMD();
+      setManilaDay(prev => (prev !== ymd ? ymd : prev));
+    }, 60 * 1000); // check every minute
+    return () => clearInterval(id);
+  }, []);
+
   const toManilaTime = (iso?: string | null) => {
     if (!iso) return '';
     try {
@@ -137,15 +152,12 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
         // Build query for visitorslog
         const params = new URLSearchParams();
         if (filter === 'today') {
-          // Use Manila date for createdAt
-          const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-          const ymd = d.toISOString().slice(0,10);
+          // Use Manila date (YYYY-MM-DD)
+          const ymd = getManilaYMD();
           params.set('createdAt', ymd);
         } else if (filter === 'month') {
-          const start = new Date(todayManila.getFullYear(), todayManila.getMonth(), 1);
-          const end = new Date(todayManila.getFullYear(), todayManila.getMonth() + 1, 0);
-          const ymd1 = new Date(start.toLocaleString('en-US', { timeZone: 'Asia/Manila' })).toISOString().slice(0,10);
-          const ymd2 = new Date(end.toLocaleString('en-US', { timeZone: 'Asia/Manila' })).toISOString().slice(0,10);
+          const ymd1 = new Date(monthStartManila).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+          const ymd2 = new Date(monthEndManila).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
           params.set('startDate', ymd1);
           params.set('endDate', ymd2);
         } else if (filter === 'range' && dateFrom && dateTo) {
@@ -165,8 +177,8 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
         const toManilaDateOnly = (iso?: string | null) => {
           if (!iso) return null;
           try {
-            const d = new Date(new Date(iso).toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-            return d.toISOString().slice(0,10);
+            // Return YYYY-MM-DD in Manila time
+            return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
           } catch { return null; }
         };
 
@@ -225,7 +237,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
       }
     };
     fetchData();
-  }, [filter, dateFrom, dateTo, rangeFetchTrigger]);
+  }, [filter, dateFrom, dateTo, rangeFetchTrigger, manilaDay]);
 
   const handleRangeClick = () => { setPendingDateFrom(dateFrom); setPendingDateTo(dateTo); setShowModal(true); setDateError(''); };
   const handleModalSubmit = (e: React.FormEvent) => {

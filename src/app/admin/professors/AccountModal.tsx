@@ -27,12 +27,24 @@ const AccountModal: React.FC<Props> = ({ show, onClose, professor, onSuccess }) 
   const [error, setError] = useState('');
   const [departmentName, setDepartmentName] = useState<string | null>(null);
 
+  const generatePassword = (len: number = 8) => {
+    try {
+      const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      const array = new Uint32Array(len);
+      crypto.getRandomValues(array);
+      return Array.from(array, x => charset[x % charset.length]).join('');
+    } catch {
+      // Fallback if crypto.getRandomValues not available
+      return Math.random().toString(36).slice(-len).padEnd(len, 'x');
+    }
+  };
+
   useEffect(() => {
     if (professor) {
       // Suggest a username by combining first and last name
       const suggested = `${professor.first_name}.${professor.last_name}`.toLowerCase().replace(/\s+/g, '');
-      setUsername(suggested);
-      setPassword('');
+  setUsername(suggested);
+  setPassword(generatePassword(8));
   setError('');
   setEmail(professor.email ?? '');
   setPhone(professor.phone ?? '');
@@ -170,7 +182,11 @@ const AccountModal: React.FC<Props> = ({ show, onClose, professor, onSuccess }) 
             <input className="form-control" value={username} onChange={e => setUsername(e.target.value)} />
 
             <label style={{ fontWeight: 600 }}>Password</label>
-            <input className="form-control" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+            <div className="input-group">
+              <input className="form-control" type="text" value={password} onChange={e => setPassword(e.target.value)} />
+              <button type="button" className="btn btn-outline-secondary" onClick={() => setPassword(generatePassword(8))}>Regenerate</button>
+            </div>
+            <div style={{ fontSize: 12, color: '#666' }}>An 8-character temporary password is generated automatically. You can regenerate or edit it.</div>
 
             <label style={{ fontWeight: 600 }}>Email</label>
             <input className="form-control" type="email" value={email} onChange={e => setEmail(e.target.value)} />

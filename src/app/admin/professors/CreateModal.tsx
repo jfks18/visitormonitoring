@@ -45,13 +45,58 @@ const CreateModal: React.FC<CreateModalProps> = ({ show, onClose, onSuccess, dep
     setSubmitLoading(true);
     try {
       const payload = { ...form, department: Number(form.department) };
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev'}/api/professors`, {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+      // 1) Save professor first
+      const res = await fetch(`${apiBase}/api/professors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to create professor');
+      const text = await res.text();
+      let data: any = {}; try { data = JSON.parse(text); } catch { data = { raw: text }; }
+      if (!res.ok) throw new Error(data.message || data.raw || 'Failed to create professor');
+
+      // 2) Create linked user account with 8-char random password and username=first.last
+      const username = `${form.first_name}.${form.last_name}`.toLowerCase().replace(/\s+/g, '');
+      const genPassword = (() => {
+        try {
+          const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+          const arr = new Uint32Array(8);
+          // @ts-ignore
+          crypto.getRandomValues(arr);
+          return Array.from(arr, x => charset[x % charset.length]).join('');
+        } catch {
+          return Math.random().toString(36).slice(-8).padEnd(8, 'x');
+        }
+      })();
+
+      const userPayload = {
+        username,
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        password: genPassword,
+        dept_id: Number(form.department) || null,
+        // role defaults to 2 (professor) on server if omitted
+      } as any;
+
+      try {
+        const ures = await fetch(`${apiBase}/api/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userPayload),
+        });
+        const utext = await ures.text();
+        let ujson: any = {}; try { ujson = JSON.parse(utext); } catch { ujson = { raw: utext }; }
+        if (!ures.ok) {
+          // Don’t rollback professor; surface message
+          throw new Error(ujson.message || ujson.raw || 'Failed to create user account');
+        }
+        alert(`Employee created with account.\n\nUsername: ${username}\nTemp Password: ${genPassword}\nEmail: ${form.email}`);
+      } catch (accErr: any) {
+        console.error('User account creation failed:', accErr);
+        alert(`Professor saved, but account creation failed.\n\nReason: ${accErr.message || accErr}`);
+      }
+
       setForm({ ...initialForm });
       onClose();
       onSuccess();

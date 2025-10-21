@@ -14,6 +14,16 @@ type OfficeVisitRow = {
   qr_tagged?: boolean | null;
 };
 
+type VisitorsLogRow = {
+  visitorsID: string;
+  createdAt?: string | null; // when the log row was created
+  timeIn?: string | null;
+  timeOut?: string | null;
+  date?: string | null; // optional explicit date from API
+  // allow any other fields but we don't rely on them here
+  [key: string]: any;
+};
+
 type GroupedVisit = {
   visitorsID: string;
   date: string; // YYYY-MM-DD Manila
@@ -28,6 +38,8 @@ type GroupedVisit = {
     qr_tagged?: boolean | null;
   }>;
   tagged?: boolean; // any office tagged
+  timeInISO?: string | null;
+  timeOutISO?: string | null;
 };
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
@@ -68,8 +80,18 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
   const [showActions, setShowActions] = useState(true);
   const [rangeFetchTrigger, setRangeFetchTrigger] = useState(0);
   const [selectedGroup, setSelectedGroup] = useState<GroupedVisit | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
   const router = useRouter();
   const tableRef = useRef<HTMLTableElement | null>(null);
+  const openGroupModal = useOpenGroupModal(setSelectedGroup, setModalLoading, apiBase);
+
+  const toManilaTime = (iso?: string | null) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(new Date(iso).toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } catch { return ''; }
+  };
 
   function getManilaDayRange(date: Date) {
     const manila = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
@@ -83,62 +105,101 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
   const monthStartManila = new Date(todayManila.getFullYear(), todayManila.getMonth(), 1);
   const monthEndManila = new Date(todayManila.getFullYear(), todayManila.getMonth() + 1, 0);
 
+  // Build a full ISO datetime in Manila (+08:00) from a YYYY-MM-DD and a time-like value
+  const normalizeTimeOnDate = (dateYMD: string, timeLike?: string | null): string | null => {
+    if (!timeLike) return null;
+    const t = String(timeLike).trim();
+    if (!t) return null;
+    // If already a full datetime (contains 'T') or timezone, trust it
+    if (/T/.test(t) || /Z|\+\d{2}:?\d{2}$/.test(t)) {
+      const d = new Date(t);
+      return isNaN(d.getTime()) ? null : t;
+    }
+    // Match HH:mm or HH:mm:ss (24h)
+    const m = t.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+    if (m) {
+      const hh = m[1].padStart(2, '0');
+      const mm = m[2].padStart(2, '0');
+      const ss = (m[3] ?? '00').padStart(2, '0');
+      return `${dateYMD}T${hh}:${mm}:${ss}+08:00`;
+    }
+    // Try Date parsing as fallback
+    const d2 = new Date(t);
+    if (!isNaN(d2.getTime())) return d2.toISOString();
+    return null;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${apiBase}/api/office_visits`, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } });
+        // Build query for visitorslog
+        const params = new URLSearchParams();
+        if (filter === 'today') {
+          // Use Manila date for createdAt
+          const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+          const ymd = d.toISOString().slice(0,10);
+          params.set('createdAt', ymd);
+        } else if (filter === 'month') {
+          const start = new Date(todayManila.getFullYear(), todayManila.getMonth(), 1);
+          const end = new Date(todayManila.getFullYear(), todayManila.getMonth() + 1, 0);
+          const ymd1 = new Date(start.toLocaleString('en-US', { timeZone: 'Asia/Manila' })).toISOString().slice(0,10);
+          const ymd2 = new Date(end.toLocaleString('en-US', { timeZone: 'Asia/Manila' })).toISOString().slice(0,10);
+          params.set('startDate', ymd1);
+          params.set('endDate', ymd2);
+        } else if (filter === 'range' && dateFrom && dateTo) {
+          params.set('startDate', dateFrom);
+          params.set('endDate', dateTo);
+        }
+
+        const url = `${apiBase}/api/visitorslog${params.toString() ? `?${params.toString()}` : ''}`;
+        const res = await fetch(url, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } });
         const text = await res.text();
         if (!res.ok) throw new Error(`Fetch failed: ${text}`);
         if (text.trim().startsWith('<!DOCTYPE html>')) throw new Error('Received HTML instead of JSON from API');
-        const rows: OfficeVisitRow[] = JSON.parse(text || '[]');
+        const logs: VisitorsLogRow[] = JSON.parse(text || '[]');
+        const arr = Array.isArray(logs) ? logs : [logs];
 
-        let filtered = rows;
-        if (filter === 'today') {
-          const { start, end } = getManilaDayRange(todayManila);
-          filtered = rows.filter(r => (r.createdAt ?? '') >= start && (r.createdAt ?? '') <= end);
-        } else if (filter === 'month') {
-          const start = getManilaDayRange(monthStartManila).start;
-          const end = getManilaDayRange(monthEndManila).end;
-          filtered = rows.filter(r => (r.createdAt ?? '') >= start && (r.createdAt ?? '') <= end);
-        } else if (filter === 'range' && dateFrom && dateTo) {
-          const from = new Date(dateFrom + 'T00:00:00');
-          const to = new Date(dateTo + 'T00:00:00');
-          const start = getManilaDayRange(from).start;
-          const end = getManilaDayRange(to).end;
-          filtered = rows.filter(r => (r.createdAt ?? '') >= start && (r.createdAt ?? '') <= end);
-        }
+        // Helper: get Manila date string from any plausible field
+        const toManilaDateOnly = (iso?: string | null) => {
+          if (!iso) return null;
+          try {
+            const d = new Date(new Date(iso).toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+            return d.toISOString().slice(0,10);
+          } catch { return null; }
+        };
 
-        const [officeRes, profRes] = await Promise.all([
-          fetch(`${apiBase}/api/offices`, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } }).then(r => r.text()).then(t => { try { return JSON.parse(t); } catch { return []; } }).catch(() => []),
-          fetch(`${apiBase}/api/professors`, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } }).then(r => r.text()).then(t => { try { return JSON.parse(t); } catch { return []; } }).catch(() => []),
-        ]);
-
-        const officeMap: Record<string, any> = {};
-        if (Array.isArray(officeRes)) officeRes.forEach((o: any) => { officeMap[String(o.id)] = o; });
-        const profMap: Record<string, any> = {};
-        if (Array.isArray(profRes)) profRes.forEach((p: any) => { profMap[String(p.id)] = p; });
-
+        // Group by visitorsID + date (Manila) using createdAt/timeIn/timeOut to determine the date
         const groups: Record<string, GroupedVisit> = {};
-        for (const r of filtered) {
-          const visitorsID = r.visitorsID;
-          const manilaDate = new Date(new Date(r.createdAt ?? '').toLocaleString('en-US', { timeZone: 'Asia/Manila' })).toISOString().slice(0, 10);
-          const key = `${visitorsID}__${manilaDate}`;
-          if (!groups[key]) groups[key] = { visitorsID, date: manilaDate, offices: [], visitor: String(visitorsID) };
-          groups[key].offices.push({
-            dept_id: r.dept_id,
-            office: officeMap[String(r.dept_id)] ? (officeMap[String(r.dept_id)].department || officeMap[String(r.dept_id)].name) : String(r.dept_id ?? ''),
-            prof_id: r.prof_id,
-            professor: formatFullName(profMap[String(r.prof_id)]) || '',
-            purpose: r.purpose,
-            createdAt: r.createdAt,
-            qr_tagged: (r as any).qr_tagged ?? null,
-          });
+        for (const r of arr) {
+          const vid = String(r.visitorsID || '');
+          if (!vid) continue;
+          const dateKey = r.date || toManilaDateOnly(r.createdAt) || toManilaDateOnly(r.timeIn) || toManilaDateOnly(r.timeOut);
+          if (!dateKey) continue;
+          const key = `${vid}__${dateKey}`;
+          if (!groups[key]) {
+            groups[key] = { visitorsID: vid, date: dateKey, offices: [], visitor: vid, timeInISO: null, timeOutISO: null };
+          }
+          // Accumulate earliest timeIn and latest timeOut across rows of the same day
+          const current = groups[key];
+          const tInRaw = (r as any).timeIn ?? (r as any).time_in ?? null;
+          const tOutRaw = (r as any).timeOut ?? (r as any).time_out ?? null;
+          const tIn = normalizeTimeOnDate(dateKey, tInRaw);
+          const tOut = normalizeTimeOnDate(dateKey, tOutRaw);
+          if (tIn) {
+            if (!current.timeInISO) current.timeInISO = tIn;
+            else if (new Date(tIn).getTime() < new Date(current.timeInISO).getTime()) current.timeInISO = tIn;
+          }
+          if (tOut) {
+            if (!current.timeOutISO) current.timeOutISO = tOut;
+            else if (new Date(tOut).getTime() > new Date(current.timeOutISO).getTime()) current.timeOutISO = tOut;
+          }
         }
 
-        const groupedArray = Object.values(groups);
+        const groupedArray = Object.values(groups).sort((a,b) => (a.date < b.date ? 1 : -1));
 
+        // Fetch visitor names once
         const uniqueVisitorIDs = Array.from(new Set(groupedArray.map(g => g.visitorsID)));
         const visitorMap: Record<string, any> = {};
         await Promise.all(uniqueVisitorIDs.map(async (vid) => {
@@ -153,14 +214,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
         groupedArray.forEach(g => {
           const v = visitorMap[g.visitorsID];
           const name = formatFullName(v);
-          if (name) {
-            g.visitor = name;
-          } else {
-            // helpful debug output in browser console to inspect shape
-            if (v) console.warn(`No formatted name for visitorsID=${g.visitorsID}`, v);
-          }
-          // compute tagged status for the grouped visit
-          g.tagged = g.offices.some(o => o.qr_tagged === true);
+          if (name) g.visitor = name;
         });
 
         setData(groupedArray);
@@ -184,7 +238,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
   const handleExportExcel = () => {
     setShowActions(false);
     setTimeout(() => {
-      const exportData = data.flatMap(g => g.offices.map(o => ({ 'Visitor ID': g.visitorsID, 'Name': g.visitor || '', 'Date': g.date, 'Office': o.office, 'Professor': o.professor || '', 'Purpose': o.purpose || '', 'Time': o.createdAt ? toManilaDateTime(o.createdAt) : '' })));
+  const exportData = data.flatMap(g => g.offices.map(o => ({ 'Visitor ID': g.visitorsID, 'Name': g.visitor || '', 'Time In': toManilaTime(g.timeInISO), 'Time Out': toManilaTime(g.timeOutISO), 'Date': g.date, 'Office': o.office, 'Professor': o.professor || '', 'Purpose': o.purpose || '', 'Time (Entry)': o.createdAt ? toManilaDateTime(o.createdAt) : '' })));
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Visits'); XLSX.writeFile(wb, 'office_visits_report.xlsx'); setShowActions(true);
     }, 100);
@@ -196,8 +250,8 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
       const jsPDF = (await import('jspdf')).default;
       const autoTable = (await import('jspdf-autotable')).default;
       const doc = new jsPDF();
-      const exportData = data.flatMap(g => g.offices.map(o => [g.visitorsID, g.visitor || '', g.date, o.office, o.professor || '', o.purpose || '', o.createdAt ? toManilaDateTime(o.createdAt) : '']));
-      autoTable(doc, { head: [['Visitor ID','Name','Date','Office','Professor','Purpose','Time']], body: exportData }); doc.save('office_visits_report.pdf'); setShowActions(true);
+  const exportData = data.flatMap(g => g.offices.map(o => [g.visitorsID, g.visitor || '', toManilaTime(g.timeInISO), toManilaTime(g.timeOutISO), g.date, o.office, o.professor || '', o.purpose || '', o.createdAt ? toManilaDateTime(o.createdAt) : '']));
+  autoTable(doc, { head: [['Visitor ID','Name','Time In','Time Out','Date','Office','Professor','Purpose','Time (Entry)']], body: exportData }); doc.save('office_visits_report.pdf'); setShowActions(true);
     }, 100);
   };
 
@@ -233,30 +287,38 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
                 <input type="text" className="form-control" style={{ maxWidth: 260, borderRadius: 8, border: '1px solid #e3f6fd', fontSize: 15 }} placeholder="Search visitor name..." value={search} onChange={e => setSearch(e.target.value)} />
               </div>
 
-              <div style={{ maxHeight: 420, overflowY: 'auto', borderRadius: 12 }}>
+              <div className="main-table-scroll" style={{ borderRadius: 12 }}>
                 <table ref={tableRef} style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
                   <thead>
                     <tr style={{ color: '#888', fontWeight: 600, fontSize: 15, textAlign: 'left' }}>
                       <th style={{ padding: '16px 8px' }}>Visitor ID</th>
                       <th style={{ padding: '16px 8px' }}>Name</th>
+                      <th style={{ padding: '16px 8px' }}>Time In</th>
+                      <th style={{ padding: '16px 8px' }}>Time Out</th>
                       <th style={{ padding: '16px 8px' }}>Date</th>
                       <th style={{ padding: '16px 8px' }}>Offices / Professors</th>
                       <th style={{ padding: '16px 8px' }}></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((g, idx) => (
-                      <tr key={`${g.visitorsID}-${g.date}-${idx}`} style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }} onClick={() => { setSelectedGroup(g); }}>
+                    {filteredData.map((g, idx) => (
+                      <tr key={`${g.visitorsID}-${g.date}-${idx}`} style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }} onClick={() => { openGroupModal(g); }}>
                         <td style={{ padding: '14px 8px', color: '#bdbdbd', fontWeight: 500 }}>{g.visitorsID}</td>
                         <td style={{ padding: '14px 8px', color: '#222', fontWeight: 500 }}>{g.visitor ?? g.visitorsID}</td>
+                        <td style={{ padding: '14px 8px', color: '#666' }}>{toManilaTime(g.timeInISO)}</td>
+                        <td style={{ padding: '14px 8px', color: '#666' }}>{toManilaTime(g.timeOutISO)}</td>
                         <td style={{ padding: '14px 8px', color: '#666' }}>{g.date}</td>
                         <td style={{ padding: '14px 8px' }}>
-                          {g.offices.map((o, oi) => (
-                            <div key={oi} style={{ marginBottom: 6 }}>
-                              <strong>{o.office}</strong>{o.professor ? ` — ${o.professor}` : ''}
-                              <div style={{ color: '#666', fontSize: 13 }}>{o.purpose || ''}</div>
-                            </div>
-                          ))}
+                          {g.offices && g.offices.length > 0 ? (
+                            g.offices.map((o, oi) => (
+                              <div key={oi} style={{ marginBottom: 6 }}>
+                                <strong>{o.office}</strong>{o.professor ? ` — ${o.professor}` : ''}
+                                <div style={{ color: '#666', fontSize: 13 }}>{o.purpose || ''}</div>
+                              </div>
+                            ))
+                          ) : (
+                            <span style={{ color: '#999' }}>Click row to view details</span>
+                          )}
                         </td>
                         <td style={{ padding: '14px 8px' }}>
                           <button className="btn btn-link p-0" style={{ color: '#22577A' }} title="Print Visitor Pass" onClick={(e) => { e.stopPropagation(); router.push(`/registration/print?visitorID=${g.visitorsID}`); }}>
@@ -269,6 +331,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
                 </table>
                 {filteredData.length === 0 && <div style={{ textAlign: 'center', color: '#888', padding: '24px 0' }}>No visits found.</div>}
               </div>
+              {MainTableScrollStyles}
             </div>
           )}
         </div>
@@ -276,7 +339,7 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
 
       {showModal && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
-          <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Select Date Range</h5>
@@ -315,34 +378,39 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
               </div>
               <div className="modal-body">
                 <div style={{ marginBottom: 12 }}><strong>Visitor:</strong> {selectedGroup.visitor ?? selectedGroup.visitorsID}</div>
-                <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Office</th>
-                        <th>Professor</th>
-                        <th>Purpose</th>
-                        <th>Time</th>
-                        <th>QR Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedGroup.offices.map((o, i) => (
-                        <tr key={i}>
-                          <td>{o.office}</td>
-                          <td>{o.professor || ''}</td>
-                          <td>{o.purpose || ''}</td>
-                          <td>{o.createdAt ? toManilaDateTime(o.createdAt) : '-'}</td>
-                          <td>{o.qr_tagged ? 'qr_tagged' : 'not visited'}</td>
+                {modalLoading ? (
+                  <div className="text-center py-3"><span className="spinner-border text-primary" role="status"></span></div>
+                ) : (
+                  <div className="modal-table-scroll">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Office</th>
+                          <th>Professor</th>
+                          <th>Purpose</th>
+                          <th>Time</th>
+                          <th>QR Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {selectedGroup.offices.map((o, i) => (
+                          <tr key={i}>
+                            <td>{o.office}</td>
+                            <td>{o.professor || ''}</td>
+                            <td>{o.purpose || ''}</td>
+                            <td>{o.createdAt ? toManilaDateTime(o.createdAt) : '-'}</td>
+                            <td>{o.qr_tagged ? 'qr_tagged' : 'not visited'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setSelectedGroup(null)}>Close</button>
               </div>
+              {ModalTableScrollStyles}
             </div>
           </div>
         </div>
@@ -353,3 +421,121 @@ const Table: React.FC<TableProps> = ({ initialFilter = 'today', hideControls = f
 };
 
 export default Table;
+
+// Scoped styles for scrollable table area in modal
+// Using styled-jsx to keep styles in this component file
+// Ensures only the table region scrolls and header stays visible
+// Adjust max-height as needed to fit your layout
+// Note: Next.js supports global styles via globals.css; this is local to the component
+// eslint-disable-next-line @next/next/no-sync-scripts
+export const ModalTableScrollStyles = (
+  <style jsx>{`
+    .modal-table-scroll {
+      max-height: 60vh;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .modal-table-scroll thead th {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
+    }
+    /* Optional nicer scrollbar */
+    .modal-table-scroll::-webkit-scrollbar { width: 8px; }
+    .modal-table-scroll::-webkit-scrollbar-thumb { background: #cfd8dc; border-radius: 4px; }
+    .modal-table-scroll::-webkit-scrollbar-track { background: transparent; }
+  `}</style>
+);
+
+// Scoped styles for the main table scroll container
+export const MainTableScrollStyles = (
+  <style jsx>{`
+    .main-table-scroll {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .main-table-scroll thead th {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 2;
+    }
+    .main-table-scroll::-webkit-scrollbar { width: 8px; }
+    .main-table-scroll::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
+    .main-table-scroll::-webkit-scrollbar-track { background: transparent; }
+  `}</style>
+);
+
+// Helper to open modal and load office/professor details for a visitor on a given date
+function openGroupModalFactory(
+  setSelectedGroup: React.Dispatch<React.SetStateAction<GroupedVisit | null>>,
+  setModalLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  apiBase: string
+) {
+  const toManilaDateOnly = (iso?: string | null) => {
+    if (!iso) return null;
+    try {
+      const d = new Date(new Date(iso).toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      return d.toISOString().slice(0,10);
+    } catch { return null; }
+  };
+
+  return async (g: GroupedVisit) => {
+    setSelectedGroup({ ...g, offices: [] });
+    setModalLoading(true);
+    try {
+      // Fetch maps for offices and professors
+      const [officeResText, profResText] = await Promise.all([
+        fetch(`${apiBase}/api/offices`, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } }).then(r => r.text()).catch(() => '[]'),
+        fetch(`${apiBase}/api/professors`, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } }).then(r => r.text()).catch(() => '[]'),
+      ]);
+      let officeRes: any[] = [];
+      let profRes: any[] = [];
+      try { officeRes = JSON.parse(officeResText || '[]'); } catch { officeRes = []; }
+      try { profRes = JSON.parse(profResText || '[]'); } catch { profRes = []; }
+
+      const officeMap: Record<string, any> = {};
+      if (Array.isArray(officeRes)) officeRes.forEach((o: any) => { officeMap[String(o.id)] = o; });
+      const profMap: Record<string, any> = {};
+      if (Array.isArray(profRes)) profRes.forEach((p: any) => { profMap[String(p.id)] = p; });
+
+      // Fetch office visits and filter by visitor/date
+      const ovText = await fetch(`${apiBase}/api/office_visits`, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } }).then(r => r.text());
+      const rows: OfficeVisitRow[] = JSON.parse(ovText || '[]');
+
+      const offices = rows
+        .filter(r => String(r.visitorsID) === String(g.visitorsID))
+        .filter(r => {
+          const d = toManilaDateOnly(r.createdAt);
+          return d === g.date;
+        })
+        .map(r => ({
+          dept_id: r.dept_id,
+          office: officeMap[String(r.dept_id)] ? (officeMap[String(r.dept_id)].department || officeMap[String(r.dept_id)].name) : String(r.dept_id ?? ''),
+          prof_id: r.prof_id,
+          professor: formatFullName(profMap[String(r.prof_id)]) || '',
+          purpose: r.purpose,
+          createdAt: r.createdAt,
+          qr_tagged: (r as any).qr_tagged ?? null,
+        }));
+
+      setSelectedGroup({ ...g, offices });
+    } catch (e) {
+      console.error('Failed loading group details', e);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+}
+
+// Create a bound handler inside component scope
+function useOpenGroupModal(
+  setSelectedGroup: React.Dispatch<React.SetStateAction<GroupedVisit | null>>,
+  setModalLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  apiBase: string
+) {
+  const ref = React.useRef<ReturnType<typeof openGroupModalFactory> | null>(null);
+  if (!ref.current) ref.current = openGroupModalFactory(setSelectedGroup, setModalLoading, apiBase);
+  return ref.current!;
+}

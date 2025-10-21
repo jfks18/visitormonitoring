@@ -178,8 +178,8 @@ const AccountModal: React.FC<Props> = ({ show, onClose, professor, onSuccess }) 
             <label style={{ fontWeight: 600 }}>Phone</label>
             <input className="form-control" value={phone} onChange={e => setPhone(e.target.value)} />
 
-            <label style={{ fontWeight: 600 }}>Role</label>
-            <input className="form-control" value="professor" readOnly />
+            <label hidden style={{ fontWeight: 600 }}>Role</label>
+            <input hidden className="form-control" value="professor" readOnly />
 
             {error && <div className="alert alert-danger py-1">{error}</div>}
 

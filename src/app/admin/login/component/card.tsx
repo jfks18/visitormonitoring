@@ -21,10 +21,16 @@ const LoginCard = () => {
         const roleCode = typeof rawRole === 'number' ? rawRole : Number(rawRole);
         // Debug: log role values returned from backend
         try {
-          console.log('[Login] rawRole:', rawRole, '| roleCode:', roleCode, '| user.id:', data.user?.id, '| dept_id:', data.user?.dept_id);
+          console.log('[Login] rawRole:', rawRole, '| roleCode:', roleCode, '| user.id:', data.user?.id, '| prof_id:', data.user?.prof_id, '| dept_id:', data.user?.dept_id);
         } catch {}
         const deptId = data.user.dept_id ?? null;
         const userId = data.user.id ?? data.user.prof_id ?? data.user.user_id ?? null;
+        // Parse prof_id even if it's a numeric string (e.g., "22")
+        const rawProfId = data.user.prof_id ?? null;
+        const parsedProfId = typeof rawProfId === 'number'
+          ? rawProfId
+          : (typeof rawProfId === 'string' && rawProfId.trim() ? Number(rawProfId) : null);
+        const profId = parsedProfId ?? (typeof userId === 'number' ? userId : null);
 
         // Build a unified auth object and store under adminAuth (for backward compatibility)
         const authPayload = {
@@ -33,12 +39,31 @@ const LoginCard = () => {
           role: rawRole, // store numeric role
           dept_id: deptId,
           user_id: userId,
+          prof_id: profId,
         } as any;
-        try { localStorage.setItem('adminAuth', JSON.stringify(authPayload)); } catch {}
+        try {
+          localStorage.setItem('adminAuth', JSON.stringify(authPayload));
+          try {
+            const saved = localStorage.getItem('adminAuth');
+            console.log('[Login] stored adminAuth:', saved ? JSON.parse(saved) : null);
+          } catch {}
+        } catch {}
 
         // If faculty (role 2), also store a facultyAuth for faculty pages convenience
         if (rawRole === 2) {
-          try { localStorage.setItem('facultyAuth', JSON.stringify({ token: authPayload.adminToken, username: authPayload.username, id: userId, role: roleCode })); } catch {}
+          try {
+            localStorage.setItem('facultyAuth', JSON.stringify({
+              token: authPayload.adminToken,
+              username: authPayload.username,
+              id: profId ?? userId, // prefer prof_id
+              prof_id: profId,
+              role: roleCode
+            }));
+            try {
+              const savedF = localStorage.getItem('facultyAuth');
+              console.log('[Login] stored facultyAuth:', savedF ? JSON.parse(savedF) : null);
+            } catch {}
+          } catch {}
         }
 
         // Redirect by numeric role

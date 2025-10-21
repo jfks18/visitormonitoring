@@ -16,6 +16,9 @@ const Table = () => {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [department, setDepartment] = useState('');
+  const [accUsername, setAccUsername] = useState('');
+  const [accEmail, setAccEmail] = useState('');
+  const [accPhone, setAccPhone] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -61,17 +64,72 @@ const Table = () => {
       setSubmitError('Office name is required.');
       return;
     }
+    if (!accUsername.trim()) {
+      setSubmitError('Username is required.');
+      return;
+    }
+    if (!accEmail.trim()) {
+      setSubmitError('Email is required.');
+      return;
+    }
+    if (!accPhone.trim()) {
+      setSubmitError('Phone is required.');
+      return;
+    }
     setSubmitLoading(true);
     try {
-  const res = await fetch('https://gleesome-feracious-noelia.ngrok-free.dev/api/offices', {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+      // 1) Create office
+      const res = await fetch(`${apiBase}/api/offices`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ department: department.trim() })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to create office');
+      const text = await res.text();
+      let officeJson: any = {};
+      try { officeJson = JSON.parse(text); } catch { officeJson = {}; }
+      if (!res.ok) throw new Error((officeJson && officeJson.message) || text || 'Failed to create office');
+
+      // Extract newly created office id
+      const officeId = officeJson.id ?? officeJson.insertId ?? officeJson.office_id ?? officeJson.created?.id ?? officeJson.data?.id;
+      if (!officeId) {
+        // If API doesn't return id, refetch offices and find by name as fallback
+        try {
+          await fetchOffices();
+        } catch {}
+      }
+
+      // 2) Create user account for this office (role 3)
+      // Generate 8-char random password (alphanumeric)
+      const genPassword = Math.random().toString(36).slice(-8);
+      const userPayload = {
+        username: accUsername.trim(),
+        email: accEmail.trim(),
+        phone: accPhone.trim(),
+        password: genPassword,
+        dept_id: officeId || null,
+        status: 'inactive',
+        role: 3,
+      } as any;
+      const ures = await fetch(`${apiBase}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify(userPayload)
+      });
+      const utext = await ures.text();
+      let ujson: any = {}; try { ujson = JSON.parse(utext); } catch {}
+      if (!ures.ok) {
+        throw new Error((ujson && ujson.message) || utext || 'Failed to create office account');
+      }
+
+      // Success: show credentials for admin reference
+      alert(`Office created and account provisioned.\n\nUsername: ${userPayload.username}\nEmail: ${userPayload.email}\nTemporary Password: ${genPassword}\nRole: Department (3)`);
+
       setShowModal(false);
       setDepartment('');
+      setAccUsername('');
+      setAccEmail('');
+      setAccPhone('');
       fetchOffices();
     } catch (err: any) {
       setSubmitError(err.message || 'Failed to create office');
@@ -215,6 +273,36 @@ const Table = () => {
                       onChange={e => setDepartment(e.target.value)}
                       placeholder="Enter office name"
                       autoFocus
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Username (office account)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={accUsername}
+                      onChange={e => setAccUsername(e.target.value)}
+                      placeholder="e.g. registrar.office"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Email (credentials will be sent)</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={accEmail}
+                      onChange={e => setAccEmail(e.target.value)}
+                      placeholder="office@example.com"
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Phone</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      value={accPhone}
+                      onChange={e => setAccPhone(e.target.value)}
+                      placeholder="e.g. 0917XXXXXXX"
                     />
                   </div>
                   {submitError && <div className="alert alert-danger py-1 my-2">{submitError}</div>}

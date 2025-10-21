@@ -197,7 +197,7 @@ const Table = () => {
           justifyContent: 'space-between'
         }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ marginRight: 12 }}>Professors</span>
+            <span style={{ marginRight: 12 }}>Employee</span>
             <i className="bi bi-person-badge" style={{ color: '#22577A', fontSize: 20 }}></i>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -226,7 +226,7 @@ const Table = () => {
               }}
               onClick={() => setShowModal(true)}
             >
-              <i className="bi bi-plus-lg me-2"></i> Create Professor
+              <i className="bi bi-plus-lg me-2"></i> Create Employee
             </button>
           </div>
         </div>

@@ -138,15 +138,16 @@ const RegistrationCard = () => {
           }
         });
 
-    const { data: svcRaw, error: svcError } = useSWR(officeId ? `${apiBase}/api/services/${encodeURIComponent(officeId)}` : null, serviceFetcher);
+  const { data: svcRaw, error: svcError } = useSWR(officeId ? `${apiBase}/api/services/${encodeURIComponent(officeId)}` : null, serviceFetcher);
 
     // Normalize into array of services; API might return a single object or array
     const services: Array<{ id: number | string; srvc_name: string }> = Array.isArray(svcRaw)
       ? (svcRaw as any[]).map((s: any) => ({ id: s.id ?? s.srvc_id ?? s.service_id ?? s.svc_id ?? s.code ?? String(s.srvc_name), srvc_name: s.srvc_name ?? s.name ?? String(s.srvc_name || s.name || '') }))
       : (svcRaw ? [{ id: (svcRaw as any).id ?? (svcRaw as any).srvc_id ?? (svcRaw as any).service_id ?? (svcRaw as any).svc_id ?? String((svcRaw as any).srvc_name), srvc_name: (svcRaw as any).srvc_name ?? (svcRaw as any).name ?? '' }] : []);
 
-    if (svcError) {
-      // Fallback to a text input when the API fails
+    // If API errors or no services, show manual input
+    const showManualOnly = !!svcError || !services || services.length === 0;
+    if (showManualOnly) {
       return (
         <input
           type="text"
@@ -155,31 +156,47 @@ const RegistrationCard = () => {
           onChange={e => onChange(e.target.value)}
           placeholder="Enter purpose"
           required
+          style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
         />
       );
     }
 
-    if (!services || services.length === 0) {
-      // No services configured for this department; allow manual entry
-      return (
-        <input
-          type="text"
-          className="form-control"
-          value={value || ''}
-          onChange={e => onChange(e.target.value)}
-          placeholder="Enter purpose"
-          required
-        />
-      );
-    }
-
+    // When services exist, include an "Other" option to allow custom purpose
+    const isCustom = value && !services.some(s => String(s.srvc_name) === String(value));
     return (
-      <select className="form-select" value={value || ''} onChange={e => onChange(e.target.value)} required>
-        <option value="">Select purpose</option>
-        {services.map(s => (
-          <option key={String(s.id)} value={s.srvc_name}>{s.srvc_name}</option>
-        ))}
-      </select>
+      <div>
+        <select
+          className="form-select"
+          value={isCustom ? '__other__' : (value || '')}
+          onChange={e => {
+            const v = e.target.value;
+            if (v === '__other__') {
+              // Switch to custom entry; keep current custom text if any, else empty
+              onChange(value && !services.some(s => String(s.srvc_name) === String(value)) ? value : '');
+            } else {
+              onChange(v);
+            }
+          }}
+          required={!isCustom}
+        >
+          <option value="">Select purpose</option>
+          {services.map(s => (
+            <option key={String(s.id)} value={s.srvc_name}>{s.srvc_name}</option>
+          ))}
+          <option value="__other__">Other (type manually)</option>
+        </select>
+        {isCustom && (
+          <input
+            type="text"
+            className="form-control mt-2"
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Enter custom purpose"
+            required
+            style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
+          />
+        )}
+      </div>
     );
   };
 

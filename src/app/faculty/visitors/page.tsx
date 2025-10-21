@@ -19,6 +19,19 @@ const VisitorsLogPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'today' | 'month'>('today');
+  // Track Manila calendar day (YYYY-MM-DD) so "Today" follows Manila and auto-refreshes at Manila midnight
+  const getManilaYMD = () => {
+    try { return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); }
+    catch { return new Date().toISOString().slice(0,10); }
+  };
+  const [manilaDay, setManilaDay] = useState<string>(getManilaYMD());
+  useEffect(() => {
+    const id = setInterval(() => {
+      const ymd = getManilaYMD();
+      setManilaDay(prev => (prev !== ymd ? ymd : prev));
+    }, 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const getFacultyId = (): number | null => {
     try {
@@ -29,7 +42,8 @@ const VisitorsLogPage = () => {
 
       const pickId = (obj: any) => {
         if (!obj) return null;
-        const val = obj.prof_id ?? null; // Use prof_id only
+        // Prefer user_id for consistency with profile; adjust if backend expects prof_id
+        const val = obj.user_id ?? obj.prof_id ?? null;
         if (typeof val === 'number') return val;
         if (typeof val === 'string' && val) return Number(val);
         return null;
@@ -38,7 +52,7 @@ const VisitorsLogPage = () => {
       const idFromFaculty = pickId(parsedFaculty);
       const idFromAdmin = pickId(parsedAdmin);
       const finalId = idFromFaculty ?? idFromAdmin ?? null;
-      try { console.log('[Faculty Visitors] prof_id check:', { faculty_prof_id: parsedFaculty?.prof_id, admin_prof_id: parsedAdmin?.prof_id, finalId }); } catch {}
+      try { console.log('[Faculty Visitors] id check:', { faculty_user_id: parsedFaculty?.user_id, admin_user_id: parsedAdmin?.user_id, faculty_prof_id: parsedFaculty?.prof_id, admin_prof_id: parsedAdmin?.prof_id, finalId }); } catch {}
       return finalId;
     } catch { return null; }
   };
@@ -55,7 +69,7 @@ const VisitorsLogPage = () => {
       }
       const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
       try {
-        // New API: path param /api/office_visits/:prof_id
+        // Backend accepts professor/user identifier via query param `id`
         const res = await fetch(`${apiBase}/api/office_visits?id=${encodeURIComponent(profId)}`, {
           headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         });
@@ -81,39 +95,46 @@ const VisitorsLogPage = () => {
     load();
   }, []);
 
-  // Helpers to compute Manila-local date ranges
-  function getManilaDayRange(date: Date) {
-    const manila = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    manila.setHours(0, 0, 0, 0);
-    // convert back to ISO range that matches stored createdAt
-    const start = new Date(manila.getTime() - (manila.getTimezoneOffset() * 60000));
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
-    return { start: start.toISOString(), end: end.toISOString() };
-  }
-
-  const todayManila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-  const monthStartManila = new Date(todayManila.getFullYear(), todayManila.getMonth(), 1);
-  const monthEndManila = new Date(todayManila.getFullYear(), todayManila.getMonth() + 1, 0);
+  // Helpers for Manila-local date comparisons using YYYY-MM-DD strings
+  const toManilaYMD = (iso?: string | null): string | null => {
+    if (!iso) return null;
+    try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); }
+    catch { return null; }
+  };
+  const todayYMD = manilaDay; // already Manila YYYY-MM-DD
+  const monthStartYMD = useMemo(() => {
+    try {
+      const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+    } catch { return todayYMD; }
+  }, [todayYMD]);
+  const monthEndYMD = useMemo(() => {
+    try {
+      const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      return new Date(d.getFullYear(), d.getMonth() + 1, 0).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+    } catch { return todayYMD; }
+  }, [todayYMD]);
 
   const filteredRows = useMemo(() => {
     if (!rows || rows.length === 0) return [];
     try {
+      const sorted = [...rows].sort((a, b) => {
+        const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bt - at;
+      });
       if (filter === 'today') {
-        const { start, end } = getManilaDayRange(todayManila);
-        return rows
-          .filter(r => !!r.createdAt && (r.createdAt as string) >= start && (r.createdAt as string) <= end)
-          .sort((a, b) => (a.createdAt! < b.createdAt! ? 1 : -1));
+        return sorted.filter(r => toManilaYMD(r.createdAt) === todayYMD);
       }
-      // month filter
-      const start = getManilaDayRange(monthStartManila).start;
-      const end = getManilaDayRange(monthEndManila).end;
-      return rows
-        .filter(r => !!r.createdAt && (r.createdAt as string) >= start && (r.createdAt as string) <= end)
-        .sort((a, b) => (a.createdAt! < b.createdAt! ? 1 : -1));
+      // month filter using YYYY-MM-DD string comparison (safe for en-CA format)
+      return sorted.filter(r => {
+        const ymd = toManilaYMD(r.createdAt);
+        return !!ymd && ymd >= monthStartYMD && ymd <= monthEndYMD;
+      });
     } catch {
       return rows;
     }
-  }, [rows, filter]);
+  }, [rows, filter, todayYMD, monthStartYMD, monthEndYMD]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#e3f6fd' }}>

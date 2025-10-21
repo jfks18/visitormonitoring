@@ -119,6 +119,70 @@ const RegistrationCard = () => {
     );
   };
 
+  // Child component for service/purpose select per office (by dept_id)
+  const ServiceSelect = ({ officeId, value, onChange }: { officeId: string; value: string; onChange: (v: string) => void }) => {
+    const serviceFetcher = (url: string) =>
+      fetch(url, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } })
+        .then(async res => {
+          const text = await res.text();
+          if (!res.ok) {
+            // Treat 404 as no services for this department
+            if (res.status === 404) return [] as any[];
+            throw new Error('Failed to fetch: ' + text);
+          }
+          if (text.trim().startsWith('<!DOCTYPE html>')) throw new Error('Received HTML instead of JSON.');
+          try {
+            return JSON.parse(text);
+          } catch {
+            throw new Error('Response is not valid JSON: ' + text);
+          }
+        });
+
+    const { data: svcRaw, error: svcError } = useSWR(officeId ? `${apiBase}/api/services/${encodeURIComponent(officeId)}` : null, serviceFetcher);
+
+    // Normalize into array of services; API might return a single object or array
+    const services: Array<{ id: number | string; srvc_name: string }> = Array.isArray(svcRaw)
+      ? (svcRaw as any[]).map((s: any) => ({ id: s.id ?? s.srvc_id ?? s.service_id ?? s.svc_id ?? s.code ?? String(s.srvc_name), srvc_name: s.srvc_name ?? s.name ?? String(s.srvc_name || s.name || '') }))
+      : (svcRaw ? [{ id: (svcRaw as any).id ?? (svcRaw as any).srvc_id ?? (svcRaw as any).service_id ?? (svcRaw as any).svc_id ?? String((svcRaw as any).srvc_name), srvc_name: (svcRaw as any).srvc_name ?? (svcRaw as any).name ?? '' }] : []);
+
+    if (svcError) {
+      // Fallback to a text input when the API fails
+      return (
+        <input
+          type="text"
+          className="form-control"
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          placeholder="Enter purpose"
+          required
+        />
+      );
+    }
+
+    if (!services || services.length === 0) {
+      // No services configured for this department; allow manual entry
+      return (
+        <input
+          type="text"
+          className="form-control"
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          placeholder="Enter purpose"
+          required
+        />
+      );
+    }
+
+    return (
+      <select className="form-select" value={value || ''} onChange={e => onChange(e.target.value)} required>
+        <option value="">Select purpose</option>
+        {services.map(s => (
+          <option key={String(s.id)} value={s.srvc_name}>{s.srvc_name}</option>
+        ))}
+      </select>
+    );
+  };
+
   const generateVisitorId = () => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -390,7 +454,11 @@ const RegistrationCard = () => {
                       />
                       <div className="mt-2">
                         <label className="form-label fw-semibold">Purpose for this office</label>
-                        <input type="text" className="form-control" value={selectedPurposes[officeId] || ''} onChange={e => setSelectedPurposes(prev => ({ ...prev, [officeId]: e.target.value }))} required />
+                        <ServiceSelect
+                          officeId={officeId}
+                          value={selectedPurposes[officeId] || ''}
+                          onChange={val => setSelectedPurposes(prev => ({ ...prev, [officeId]: val }))}
+                        />
                       </div>
                     </div>
                   );

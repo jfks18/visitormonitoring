@@ -19,6 +19,7 @@ const VisitorsLogPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'today' | 'month'>('today');
+  const [visitorNames, setVisitorNames] = useState<Record<string, string>>({});
   // Track Manila calendar day (YYYY-MM-DD) so "Today" follows Manila and auto-refreshes at Manila midnight
   const getManilaYMD = () => {
     try { return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); }
@@ -136,6 +137,47 @@ const VisitorsLogPage = () => {
     }
   }, [rows, filter, todayYMD, monthStartYMD, monthEndYMD]);
 
+  // Format a person's full name from various possible fields
+  function formatFullName(person: any | null | undefined) {
+    if (!person) return null;
+    const fullCandidates = ['full_name', 'fullname', 'name', 'fullName'];
+    for (const key of fullCandidates) {
+      if (person[key] && String(person[key]).trim() !== '') return String(person[key]).trim();
+    }
+    const first = person.first_name ?? person.firstName ?? person.firstname ?? person.fname ?? person.given_name;
+    const middle = person.middle_name ?? person.middleName ?? person.middlename ?? person.mname;
+    const last = person.last_name ?? person.lastName ?? person.lastname ?? person.lname ?? person.family_name;
+    const parts = [first, middle, last].filter((p: any) => p && String(p).trim() !== '');
+    return parts.length ? parts.join(' ') : null;
+  }
+
+  // Fetch visitor names for unique visitorsID values (only those missing in cache)
+  useEffect(() => {
+    const run = async () => {
+      if (!rows || rows.length === 0) return;
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://gleesome-feracious-noelia.ngrok-free.dev';
+      const ids = Array.from(new Set(rows.map(r => String(r.visitorsID || '')).filter(Boolean)));
+      const missing = ids.filter(id => !visitorNames[id]);
+      if (missing.length === 0) return;
+      const entries = await Promise.all(missing.map(async (vid) => {
+        try {
+          const res = await fetch(`${apiBase}/api/visitorsdata/${encodeURIComponent(vid)}`, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } });
+          if (!res.ok) return [vid, ''] as const;
+          const json = await res.json().catch(() => null);
+          const name = formatFullName(json) || '';
+          return [vid, name] as const;
+        } catch {
+          return [vid, ''] as const;
+        }
+      }));
+      const map: Record<string, string> = {};
+      entries.forEach(([vid, name]) => { if (name) map[vid] = name; });
+      if (Object.keys(map).length > 0) setVisitorNames(prev => ({ ...prev, ...map }));
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#e3f6fd' }}>
       <Sidebar />
@@ -173,7 +215,7 @@ const VisitorsLogPage = () => {
                   <table className="table" style={{ minWidth: 720 }}>
                     <thead>
                       <tr style={{ color: '#888' }}>
-                        <th>Visitor ID</th>
+                        <th>Visitor</th>
                         <th>Prof ID</th>
                         <th>Purpose</th>
                         <th>Date/Time</th>
@@ -183,7 +225,7 @@ const VisitorsLogPage = () => {
                     <tbody>
                       {filteredRows.map(r => (
                         <tr key={r.id}>
-                          <td style={{ fontWeight: 700, color: '#22577A' }}>{r.visitorsID}</td>
+                          <td style={{ fontWeight: 700, color: '#22577A' }}>{visitorNames[String(r.visitorsID)] || r.visitorsID}</td>
                           <td>{typeof r.prof_id === 'number' ? r.prof_id : '-'}</td>
                           <td>{r.purpose || '-'}</td>
                           <td style={{ color: '#bdbdbd' }}>{r.createdAt ? toManilaDateTime(r.createdAt) : '-'}</td>

@@ -109,13 +109,45 @@ const RegistrationCard = () => {
         })
       : [];
 
+    // Fetch user status for selected professor (best effort)
+    const statusFetcher = async (url: string) => {
+      try {
+        const res = await fetch(url, { headers: { 'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true' } });
+        const text = await res.text();
+        if (!res.ok) return null; // treat as unknown
+        const json = JSON.parse(text || '{}');
+        // Try common fields for status
+        const raw = json?.status ?? json?.user?.status ?? json?.data?.status ?? null;
+        return typeof raw === 'string' ? raw.toLowerCase() : (raw != null ? String(raw).toLowerCase() : null);
+      } catch { return null; }
+    };
+    const profIdStr = value ? String(value) : '';
+    // Prefer GET by-professor if backend supports it; if it doesn't, this will simply remain null
+    const { data: status } = useSWR(
+      profIdStr ? `${apiBase}/api/professor-users/by-professor/${encodeURIComponent(profIdStr)}` : null,
+      statusFetcher
+    );
+
+    const renderStatusBadge = () => {
+      if (!profIdStr) return null;
+      const s = (status || '').toLowerCase();
+      if (!s) return <span className="badge bg-secondary" style={{ opacity: 0.6 }}>Status: Unknown</span>;
+      if (s === 'active') return <span className="badge bg-success">Active</span>;
+      if (s === 'away') return <span className="badge bg-warning text-dark">Away</span>;
+      if (s === 'inactive') return <span className="badge bg-secondary">Inactive</span>;
+      return <span className="badge bg-secondary" style={{ opacity: 0.8 }}>Status: {s}</span>;
+    };
+
     return (
-      <select className="form-select" value={value || ''} onChange={e => onChange(Number(e.target.value))}>
-        <option value="">Select professor</option>
-        {filteredProfs.map((p: any) => (
-          <option key={p.id} value={p.id}>{p.name || p.full_name || (p.last_name ? `${p.last_name}, ${p.first_name}` : p.first_name)}</option>
-        ))}
-      </select>
+      <div>
+        <select className="form-select" value={value || ''} onChange={e => onChange(Number(e.target.value))}>
+          <option value="">Select professor</option>
+          {filteredProfs.map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name || p.full_name || (p.last_name ? `${p.last_name}, ${p.first_name}` : p.first_name)}</option>
+          ))}
+        </select>
+        <div className="mt-1" style={{ minHeight: 24 }}>{renderStatusBadge()}</div>
+      </div>
     );
   };
 

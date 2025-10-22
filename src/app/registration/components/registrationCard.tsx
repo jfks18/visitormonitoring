@@ -215,7 +215,6 @@ const RegistrationCard = () => {
           {services.map(s => (
             <option key={String(s.id)} value={s.srvc_name}>{s.srvc_name}</option>
           ))}
-          <option value="__other__">Other (type manually)</option>
         </select>
         {isCustom && (
           <input

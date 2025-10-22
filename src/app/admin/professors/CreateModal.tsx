@@ -56,7 +56,9 @@ const CreateModal: React.FC<CreateModalProps> = ({ show, onClose, onSuccess, dep
       let data: any = {}; try { data = JSON.parse(text); } catch { data = { raw: text }; }
       if (!res.ok) throw new Error(data.message || data.raw || 'Failed to create professor');
 
-      // 2) Create linked user account with 8-char random password and username=first.last
+  // 2) Create linked user account with 8-char random password and username=first.last
+  // Extract professor id from professor create response so we can link the user record
+  const profId = data.id ?? data.insertId ?? data.prof_id ?? data.professor_id ?? data.created?.id ?? null;
       const username = `${form.first_name}.${form.last_name}`.toLowerCase().replace(/\s+/g, '');
       const genPassword = (() => {
         try {
@@ -76,6 +78,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ show, onClose, onSuccess, dep
         phone: form.phone.trim(),
         password: genPassword,
         dept_id: Number(form.department) || null,
+        prof_id: profId ?? null,
         // role defaults to 2 (professor) on server if omitted
       } as any;
 

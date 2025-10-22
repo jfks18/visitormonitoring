@@ -216,7 +216,6 @@ const VisitorsLogPage = () => {
                     <thead>
                       <tr style={{ color: '#888' }}>
                         <th>Visitor</th>
-                        <th>Prof ID</th>
                         <th>Purpose</th>
                         <th>Date/Time</th>
                         <th>Status</th>
@@ -226,7 +225,6 @@ const VisitorsLogPage = () => {
                       {filteredRows.map(r => (
                         <tr key={r.id}>
                           <td style={{ fontWeight: 700, color: '#22577A' }}>{visitorNames[String(r.visitorsID)] || r.visitorsID}</td>
-                          <td>{typeof r.prof_id === 'number' ? r.prof_id : '-'}</td>
                           <td>{r.purpose || '-'}</td>
                           <td style={{ color: '#bdbdbd' }}>{r.createdAt ? toManilaDateTime(r.createdAt) : '-'}</td>
                           <td>

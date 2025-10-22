@@ -37,7 +37,7 @@ const ProfilePage = () => {
       const a = rawA ? JSON.parse(rawA) : null;
       const pick = (o: any) => {
         if (!o) return null;
-        const v = o.user_id ?? null; // new endpoint expects professor id
+        const v = o.prof_id ?? null; // new endpoint expects professor id
         if (typeof v === 'number') return v;
         if (typeof v === 'string' && v) return Number(v);
         return null;

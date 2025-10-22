@@ -44,7 +44,7 @@ const VisitorsLogPage = () => {
       const pickId = (obj: any) => {
         if (!obj) return null;
         // Prefer user_id for consistency with profile; adjust if backend expects prof_id
-        const val = obj.user_id ?? obj.prof_id ?? null;
+        const val = obj.prof_id ?? null;
         if (typeof val === 'number') return val;
         if (typeof val === 'string' && val) return Number(val);
         return null;

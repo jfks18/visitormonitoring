@@ -23,6 +23,7 @@ const Sidebar = () => {
 
   const menu = [
     { label: 'Professor', path: '/departments/professor' },
+    { label: 'Scanner', path: '/departments/scanner'}
 
   ];
 

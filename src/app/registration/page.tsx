@@ -1,17 +1,19 @@
-import React from 'react'
-import Navbar from './components/navbar'
-import RegistrationCard from './components/registrationCard'
+
+import React from 'react';
+import Navbar from './components/navbar';
+import RegistrationCard from './components/registrationCard';
+import GuardAuth from '../../guards/GuardAuth';
+
 
 const page = () => {
-  // Set body background color on mount
- 
-
   return (
-    <div style={{background: '#1976d2' }}>
-      <Navbar />
-      <RegistrationCard />
-    </div>
-  )
-}
+    <GuardAuth>
+      <div style={{ background: '#1976d2' }}>
+        <Navbar />
+        <RegistrationCard />
+      </div>
+    </GuardAuth>
+  );
+};
 
-export default page
+export default page;

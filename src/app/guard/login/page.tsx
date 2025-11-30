@@ -24,10 +24,12 @@ const GuardLoginPage = () => {
       let data: any = {};
       try { data = JSON.parse(text); } catch { data = { raw: text }; }
       if (!res.ok) throw new Error(data.message || data.raw || 'Login failed');
-      if (data.role !== 4 && data.role !== '4') {
+      console.log('[GuardLogin] backend response:', data);
+      const role = data.user?.role;
+      if (role !== 4 && role !== '4') {
         throw new Error('Access denied: not a guard account');
       }
-      localStorage.setItem('guardAuth', JSON.stringify(data));
+      localStorage.setItem('guardAuth', JSON.stringify(data.user));
       router.replace('/registration'); // or '/scanner' if that's the guard home
     } catch (err: any) {
       setError(err.message || 'Login failed');

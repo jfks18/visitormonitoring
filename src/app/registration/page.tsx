@@ -2,7 +2,7 @@
 import React from 'react';
 import Navbar from './components/navbar';
 import RegistrationCard from './components/registrationCard';
-import GuardAuth from '../../guards/GuardAuth';
+import GuardAuth from '../guards/GuardAuth';
 
 
 const page = () => {
